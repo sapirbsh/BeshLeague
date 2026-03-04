@@ -6,6 +6,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:besh_league/screens/auth_screen.dart';
 import 'package:besh_league/screens/about_screen.dart'; 
 import 'package:besh_league/screens/pre_game_screen.dart'; 
+import 'package:besh_league/screens/game_board_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String sessionTicket;
@@ -871,75 +872,61 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final height = constraints.maxHeight;
-          // מביא את הריווח הבטוח של הטלפון (המגרעת של המצלמה וכו')
-          final safePadding = MediaQuery.of(context).padding;
+      body: Directionality(
+        textDirection: TextDirection.rtl, // מגדיר את כל המסך מימין לשמאל
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final height = constraints.maxHeight;
+            final safePadding = MediaQuery.of(context).padding;
 
-          return Stack(
-            children: [
-              Image.asset('assets/background_light.png', fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-              
-              // מחלקים את המסך לפס שחור עליון (שנדבק לקצה) ולשאר המסך (עם העוגנים)
-              Column(
-                children: [
-                  // הפס השחור כולל את השטח הבטוח, ולכן ידבק בדיוק למעלה!
-                  _buildTopBar(width, height, safePadding),
-                  
-                  // כל שאר המסך מתחת לפס השחור מקבל Stack כדי להצמיד פאנלים
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        // --- פאנל ימין (חברים): צמוד לחלוטין לימין ---
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: SizedBox(
-                            width: width * 0.28, 
-                            child: _buildFriendsPanel(width, height)
+            return Stack(
+              children: [
+                Image.asset('assets/background_light.png', fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                
+                Column(
+                  children: [
+                    // הפס השחור למעלה כולל שוליים בטוחים (נצמד לקצה העליון)
+                    _buildTopBar(width, height, safePadding),
+                    
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // פאנל חברים צמוד ימינה לגמרי
+                          Positioned(
+                            right: 0, 
+                            top: 0, 
+                            bottom: 0, 
+                            child: SizedBox(width: width * 0.28, child: _buildFriendsPanel(width, height))
                           ),
-                        ),
-                        
-                        // --- תפריט שמאלי: צמוד לחלוטין לשמאל (עם טיפה ריווח) ---
-                        Positioned(
-                          left: 10,
-                          top: height * 0.02,
-                          bottom: height * 0.02,
-                          child: SizedBox(
-                            width: width * 0.12, 
-                            child: _buildLeftMenu(width, height)
+                          // כפתורי חנות/ליגות/שחק צמודים שמאלה
+                          Positioned(
+                            left: 10, 
+                            top: height * 0.02, 
+                            bottom: height * 0.02, 
+                            child: SizedBox(width: width * 0.12, child: _buildLeftMenu(width, height))
                           ),
-                        ),
-
-                        // --- הפרופיל המרכזי: צף בדיוק באמצע אבל מעט למעלה ---
-                        Align(
-                          alignment: const Alignment(0.0, -0.6), 
-                          child: SizedBox(
-                            width: width * 0.45,
-                            child: _buildCenterProfile(width, height),
+                          // פרופיל באמצע, קצת מורם למעלה
+                          Align(
+                            alignment: const Alignment(0.0, -0.6), 
+                            child: SizedBox(width: width * 0.45, child: _buildCenterProfile(width, height))
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildTopBar(double width, double height, EdgeInsets safePadding) {
     return Container(
-      width: double.infinity, 
-      height: height * 0.12 + safePadding.top, 
-      color: Colors.black, 
-      padding: EdgeInsets.only(top: safePadding.top, left: width * 0.02, right: width * 0.02),
+      width: double.infinity, height: height * 0.12 + safePadding.top, color: Colors.black, padding: EdgeInsets.only(top: safePadding.top, left: width * 0.02, right: width * 0.02),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -971,7 +958,13 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           width: double.infinity, height: height * 0.16,
           decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFE040FB), Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
-          child: const Center(child: FittedBox(fit: BoxFit.scaleDown, child: Padding(padding: EdgeInsets.all(8.0), child: Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic))))),
+          // הוספנו פה מעבר לעמוד המשחק למטרות סימולציה/בדיקה כשלוחצים "שחק"
+          child: InkWell(
+            onTap: () {
+               Navigator.push(context, MaterialPageRoute(builder: (context) => const GameBoardScreen()));
+            },
+            child: const Center(child: FittedBox(fit: BoxFit.scaleDown, child: Padding(padding: EdgeInsets.all(8.0), child: Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic))))),
+          ),
         ),
       ],
     );
@@ -986,87 +979,28 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisSize: MainAxisSize.min, // קריטי כדי שהפרופיל לא יימתח על כל המסך
       children: [
         Container(
-          width: double.infinity, 
-          height: height * 0.55, 
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.85), 
-            borderRadius: BorderRadius.circular(15)
-          ),
-          padding: const EdgeInsets.all(12),
+          width: double.infinity, height: height * 0.55, decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(15)), padding: const EdgeInsets.all(12),
           child: Column(
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: height * 0.16, 
-                        height: height * 0.16, 
-                        decoration: BoxDecoration(color: Colors.grey[400], border: Border.all(color: Colors.white, width: 3)), 
-                        child: Icon(Icons.person, size: height * 0.1, color: Colors.grey[600])
-                      ),
-                      Positioned(
-                        bottom: -5, right: -10, 
-                        child: Row(children: const [Icon(Icons.favorite, color: Colors.blueAccent, size: 16), Icon(Icons.favorite, color: Colors.purple, size: 24)])
-                      ),
-                    ],
-                  ),
+                  Stack(clipBehavior: Clip.none, children: [Container(width: height * 0.16, height: height * 0.16, decoration: BoxDecoration(color: Colors.grey[400], border: Border.all(color: Colors.white, width: 3)), child: Icon(Icons.person, size: height * 0.1, color: Colors.grey[600])), Positioned(bottom: -5, right: -10, child: Row(children: const [Icon(Icons.favorite, color: Colors.blueAccent, size: 16), Icon(Icons.favorite, color: Colors.purple, size: 24)]))]),
                   const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        FittedBox(fit: BoxFit.scaleDown, child: Text(playfabUsername, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black))),
-                        const SizedBox(height: 2),
-                        FittedBox(fit: BoxFit.scaleDown, child: Text("התחברות אחרונה - $lastLogin", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
-                        const SizedBox(height: 8),
-                        FittedBox(fit: BoxFit.scaleDown, child: Text("השתתפות בליגות: $leaguesPlayed", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black))),
-                      ],
-                    ),
-                  ),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [FittedBox(fit: BoxFit.scaleDown, child: Text(playfabUsername, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black))), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text("התחברות אחרונה - $lastLogin", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))), const SizedBox(height: 8), FittedBox(fit: BoxFit.scaleDown, child: Text("השתתפות בליגות: $leaguesPlayed", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)))])),
                 ],
               ),
               const Spacer(),
-              Container(
-                width: width * 0.25, 
-                color: Colors.white,
-                child: Table(
-                  border: TableBorder.all(color: Colors.black, width: 2),
-                  children: [
-                    TableRow(children: [_buildTableCell("נצחונות", true), _buildTableCell("הפסדים", true)]),
-                    TableRow(children: [_buildTableCell("$totalWins", false), _buildTableCell("$totalLosses", false)]),
-                  ],
-                ),
-              ),
+              Container(width: width * 0.25, color: Colors.white, child: Table(border: TableBorder.all(color: Colors.black, width: 2), children: [TableRow(children: [_buildTableCell("נצחונות", true), _buildTableCell("הפסדים", true)]), TableRow(children: [_buildTableCell("$totalWins", false), _buildTableCell("$totalLosses", false)])])),
               const Spacer(),
-              Directionality(
-                textDirection: TextDirection.ltr,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.emoji_events, color: Colors.amber, size: 35),
-                    const SizedBox(width: 10),
-                    Text("X  $trophies", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black)),
-                  ],
-                ),
-              ),
+              Directionality(textDirection: TextDirection.ltr, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 35), const SizedBox(width: 10), Text("X  $trophies", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black))])),
             ],
           ),
         ),
-        
         SizedBox(height: height * 0.05), // מרווח יחסי
-        
         Container(
           width: width * 0.35, height: height * 0.12, decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.ondemand_video, size: 30), const SizedBox(width: 8),
-              Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Text("קבל 50 מטבעות", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Text("נותרו 2 צפיות", style: TextStyle(fontSize: 12))]),
-            ],
-          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.ondemand_video, size: 30), const SizedBox(width: 8), Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Text("קבל 50 מטבעות", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Text("נותרו 2 צפיות", style: TextStyle(fontSize: 12))])]),
         ),
       ],
     );
@@ -1083,16 +1017,7 @@ class _HomeScreenState extends State<HomeScreen> {
               alignment: Alignment.center,
               children: [
                 const Text("חברים", textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                Positioned(
-                  left: 5, 
-                  child: Stack( 
-                    children: [
-                      IconButton(icon: const Icon(Icons.person_add_alt_1, size: 24, color: Colors.black), onPressed: _showFriendRequestsDialog),
-                      if (friendRequests.isNotEmpty)
-                        Positioned(right: 8, top: 8, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: Text('${friendRequests.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)))),
-                    ],
-                  ),
-                ),
+                Positioned(left: 5, child: Stack(children: [IconButton(icon: const Icon(Icons.person_add_alt_1, size: 24, color: Colors.black), onPressed: _showFriendRequestsDialog), if (friendRequests.isNotEmpty) Positioned(right: 8, top: 8, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: Text('${friendRequests.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))))])),
               ],
             ),
           ),
@@ -1115,14 +1040,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Row(
                               children: [
                                 if (isOnline)
-                                  SizedBox(
-                                    height: 30,
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), 
-                                      onPressed: () => _showDuelInviteDialog(friendName), 
-                                      child: const Text("הזמן", style: TextStyle(color: Colors.white, fontSize: 12))
-                                    ),
-                                  )
+                                  SizedBox(height: 30, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), onPressed: () => _showDuelInviteDialog(friendName), child: const Text("הזמן", style: TextStyle(color: Colors.white, fontSize: 12))))
                                 else
                                   const SizedBox(width: 55), 
                                 const Spacer(),
@@ -1136,22 +1054,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
           ),
           const Divider(color: Colors.white, thickness: 3, height: 0),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              children: [
-                const Text("הוסף לפי שם משתמש", style: TextStyle(fontSize: 14)),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    SizedBox(height: 30, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 8)), onPressed: _isAddingFriend ? null : _sendFriendRequest, child: _isAddingFriend ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח בקשה", style: TextStyle(color: Colors.white, fontSize: 12)))),
-                    const SizedBox(width: 5),
-                    Expanded(child: Container(height: 30, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black)), child: TextField(controller: _friendAddController, textAlign: TextAlign.right, decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.only(bottom: 15, right: 5), isDense: true)))),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          Padding(padding: const EdgeInsets.all(8), child: Column(children: [const Text("הוסף לפי שם משתמש", style: TextStyle(fontSize: 14)), const SizedBox(height: 5), Row(children: [SizedBox(height: 30, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 8)), onPressed: _isAddingFriend ? null : _sendFriendRequest, child: _isAddingFriend ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח בקשה", style: TextStyle(color: Colors.white, fontSize: 12)))), const SizedBox(width: 5), Expanded(child: Container(height: 30, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black)), child: TextField(controller: _friendAddController, textAlign: TextAlign.right, decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.only(bottom: 15, right: 5), isDense: true))))])])),
         ],
       ),
     );
