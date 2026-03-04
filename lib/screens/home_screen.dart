@@ -941,7 +941,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLeftMenu(double width, double height) {
+Widget _buildLeftMenu(double width, double height) {
     final buttonSize = height * 0.12; 
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -958,10 +958,39 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           width: double.infinity, height: height * 0.16,
           decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFE040FB), Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
-          // הוספנו פה מעבר לעמוד המשחק למטרות סימולציה/בדיקה כשלוחצים "שחק"
           child: InkWell(
-            onTap: () {
-               Navigator.push(context, MaterialPageRoute(builder: (context) => const GameBoardScreen()));
+            onTap: () async {
+               // בודק אם יש למשתמש 50 מטבעות למשחק
+               if (coins < 50) {
+                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אין לך מספיק מטבעות למשחק. (נדרש 50)", textAlign: TextAlign.right), backgroundColor: Colors.redAccent));
+                 return;
+               }
+               
+               // פותח את מסך ההכנה במצב "חיפוש אקראי"
+               final result = await Navigator.push(
+                 context, 
+                 MaterialPageRoute(
+                   builder: (context) => PreGameScreen(
+                     sessionTicket: widget.sessionTicket,
+                     roomId: "", 
+                     myPlayFabId: widget.playFabId,
+                     myName: playfabUsername,
+                     myTrophies: trophies,
+                     opponentId: "",
+                     opponentName: "",
+                     opponentTrophies: 0,
+                     betAmount: 50, // קבוע על 50
+                     isRandomMatch: true, // מפעיל את שעון ה-20 שניות!
+                   )
+                 )
+               );
+
+               // אם עברו 20 שניות - מקפיץ הודעה
+               if (result == 'timeout' && mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text("לא נמצא שחקן. נסה שוב.", textAlign: TextAlign.right, style: TextStyle(fontSize: 16)), backgroundColor: Colors.orange)
+                 );
+               }
             },
             child: const Center(child: FittedBox(fit: BoxFit.scaleDown, child: Padding(padding: EdgeInsets.all(8.0), child: Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic))))),
           ),
@@ -969,7 +998,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
-
   Widget _buildSquareMenuButton(IconData icon, Color color, double size) {
     return Container(width: size, height: size, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black, width: 2)), child: Icon(icon, size: size * 0.5, color: Colors.black));
   }

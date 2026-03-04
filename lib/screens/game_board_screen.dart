@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-import '../services/live_game_service.dart'; // שירות השרת שיצרנו קודם
+import '../services/live_game_service.dart'; 
 
 class GameBoardScreen extends StatefulWidget {
   final String sessionTicket;
@@ -16,7 +16,6 @@ class GameBoardScreen extends StatefulWidget {
 
   const GameBoardScreen({
     super.key,
-    // אם לא נעביר נתונים (כמו בניסוי שלנו כרגע), המערכת תריץ סימולציה לבדיקת העיצוב!
     this.sessionTicket = "",
     this.roomId = "",
     this.myPlayFabId = "me_123",
@@ -36,16 +35,14 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   LiveGameService? _liveGameService;
   bool _isSimulation = false;
 
-  String _gameState = "initialRoll"; // מצבים: initialRoll, playing, gameOver
+  String _gameState = "initialRoll"; 
   String _currentTurnId = "";
   
-  // נתוני הגרלת פתיחה
   int _myInitialRoll = 0;
   int _opponentInitialRoll = 0;
   bool _isRolling = false;
   String _centerMessage = "לחץ כדי להטיל קוביית פתיחה";
 
-  // נתוני משחק (טיימר, פסילות, קוביות)
   int _timeLeft = 60;
   Timer? _turnTimer;
   int _myStrikes = 0;
@@ -60,7 +57,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   @override
   void initState() {
     super.initState();
-    // בדיקה: האם אנחנו במשחק אמיתי מול שרת או בבדיקת עיצוב (סימולציה)
     if (widget.roomId.isEmpty || widget.sessionTicket.isEmpty) {
       _isSimulation = true;
       _currentTurnId = widget.myPlayFabId; 
@@ -75,20 +71,16 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   void dispose() {
     _turnTimer?.cancel();
     if (!_isSimulation && _gameState == "gameOver") {
-      _liveGameService?.closeRoom(); // סגירת החדר בשרת כשהמשחק נגמר
+      _liveGameService?.closeRoom(); 
     }
     _liveGameService?.dispose();
     super.dispose();
   }
 
-  // קליטת נתונים מהשרת החי (יופעל כשנשחק מול יריב אמיתי)
   void _handleServerUpdate(Map<String, dynamic> data) {
     if (!mounted) return;
-    // כאן נתרגם בעתיד את מצב הלוח והמהלכים של היריב
-    // מכיוון שאנחנו רוצים כרגע לוודא שהעיצוב והחוקים עובדים, הרוב רץ בסימולציה המקומית למטה.
   }
 
-  // --- חוק 1: הגרלת קוביות פתיחה ---
   void _rollInitialDice() {
     if (_isRolling) return;
     setState(() {
@@ -112,14 +104,12 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   void _evaluateInitialRoll() {
     if (_myInitialRoll == _opponentInitialRoll) {
-      // תיקו!
       setState(() {
         _centerMessage = "תיקו! מטילים שוב...";
         _isRolling = false;
       });
       Future.delayed(const Duration(seconds: 2), _rollInitialDice);
     } else {
-      // יש מנצח בהגרלה
       bool iWon = _myInitialRoll > _opponentInitialRoll;
       setState(() {
         _centerMessage = iWon ? "ניצחת בהגרלה! אתה מתחיל." : "היריב מתחיל.";
@@ -140,7 +130,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     }
   }
 
-  // --- חוק 2: מערכת תורות, טיימר 60 שניות ופסילות ---
   void _startTurnTimer() {
     _turnTimer?.cancel();
     setState(() {
@@ -168,20 +157,19 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           _endGame(winnerName: widget.opponentName);
           return;
         }
-        _currentTurnId = widget.opponentId; // התור עובר ליריב
+        _currentTurnId = widget.opponentId; 
       } else {
         _opponentStrikes++;
         if (_opponentStrikes >= 2) {
           _endGame(winnerName: widget.myName);
           return;
         }
-        _currentTurnId = widget.myPlayFabId; // התור חוזר אלי
+        _currentTurnId = widget.myPlayFabId; 
       }
       _startTurnTimer();
     });
   }
 
-  // --- חוק 3: הטלת קוביות במהלך המשחק ---
   void _rollPlayingDice() {
     setState(() { _isRolling = true; });
     int rolls = 0;
@@ -204,7 +192,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     });
   }
 
-  // סיום משחק (ניצחון טכני)
   void _endGame({required String winnerName}) {
     setState(() { _gameState = "gameOver"; });
     _turnTimer?.cancel();
@@ -230,11 +217,37 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
+  // --- פופ-אפ אישור יציאה מהמשחק ---
+  void _confirmExitDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2328),
+        title: const Text("יציאה מהמשחק", textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text("האם אתה בטוח שברצונך לצאת?\nהחדר ייסגר והמשחק יסתיים.", textAlign: TextAlign.right, style: TextStyle(color: Colors.white70, fontSize: 16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx), 
+            child: const Text("ביטול", style: TextStyle(color: Colors.grey, fontSize: 16))
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx); 
+              if (!_isSimulation) _liveGameService?.closeRoom(); // סוגר חדר
+              Navigator.of(context).popUntil((route) => route.isFirst); // חוזר לבית
+            }, 
+            child: const Text("צא מהמשחק", style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold))
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Directionality(
-        textDirection: TextDirection.rtl, // ימין לשמאל: אנחנו נהיה בצד ימין, היריב בשמאל!
+        textDirection: TextDirection.rtl, 
         child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
@@ -246,15 +259,20 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                   child: Image.asset('assets/background_dark.png', fit: BoxFit.cover),
                 ),
 
+                // כפתור יציאה (X) שיחזיר הביתה
+                Positioned(
+                  top: height * 0.05,
+                  right: width * 0.02,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70, size: 35),
+                    onPressed: _confirmExitDialog,
+                  ),
+                ),
+
                 Row(
                   children: [
-                    // --- צד ימין: הפאנל שלי ---
                     SizedBox(width: width * 0.22, child: _buildMyPanel()),
-
-                    // --- אמצע: הלוח והקוביות ---
                     Expanded(child: _buildCenterBoard()),
-
-                    // --- צד שמאל: הפאנל של היריב ---
                     SizedBox(width: width * 0.22, child: _buildOpponentPanel()),
                   ],
                 ),
@@ -266,7 +284,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
-  // עיצוב הפאנל שלי (צד ימין)
   Widget _buildMyPanel() {
     bool isMyTurn = _currentTurnId == widget.myPlayFabId && _gameState == "playing";
     return Container(
@@ -287,14 +304,12 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           
           const Spacer(),
 
-          // טיימר (יופיע אצלי רק אם זה התור שלי)
           if (isMyTurn) ...[
             const Icon(Icons.hourglass_bottom, color: Colors.white, size: 28),
             Text("$_timeLeft", style: TextStyle(color: _timeLeft <= 10 ? Colors.red : Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
           ] else const SizedBox(height: 60),
 
           const SizedBox(height: 10),
-          // פסילות (איקסים)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -309,7 +324,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
-  // עיצוב הפאנל של היריב (צד שמאל)
   Widget _buildOpponentPanel() {
     bool isOpponentTurn = _currentTurnId == widget.opponentId && _gameState == "playing";
     return Container(
@@ -329,14 +343,12 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           
           const Spacer(),
 
-          // טיימר (יופיע אצל היריב רק אם זה התור שלו)
           if (isOpponentTurn) ...[
             const Icon(Icons.hourglass_bottom, color: Colors.white, size: 28),
             Text("$_timeLeft", style: TextStyle(color: _timeLeft <= 10 ? Colors.red : Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
           ] else const SizedBox(height: 60),
 
           const SizedBox(height: 10),
-          // פסילות (איקסים) של היריב
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -348,7 +360,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
           const SizedBox(height: 15),
 
-          // הקוביות של היריב יופיעו אצלו בצד כשהוא זורק!
           if (isOpponentTurn && _hasRolledThisTurn)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -357,7 +368,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
           const Spacer(),
 
-          // כפתור בדיקה - כדי שתוכלי לראות מה קורה כשהיריב משחק
           if (_isSimulation && isOpponentTurn)
              ElevatedButton(
                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, padding: const EdgeInsets.symmetric(horizontal: 5)),
@@ -374,10 +384,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
-  // אזור האמצע
   Widget _buildCenterBoard() {
     if (_gameState == "initialRoll") {
-      // מצב הגרלת פתיחה
       return Center(
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -410,20 +418,15 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       );
     }
 
-    // מצב משחק (הלוח האמיתי)
     return Stack(
       alignment: Alignment.center,
       children: [
-        // הפלייס-הולדר של הלוח שעליו נבנה את המשולשים בשלב הבא
         Container(
-          width: double.infinity,
-          height: double.infinity,
-          margin: const EdgeInsets.all(10),
+          width: double.infinity, height: double.infinity, margin: const EdgeInsets.all(10),
           decoration: BoxDecoration(border: Border.all(color: Colors.white24, width: 2), color: Colors.brown.withOpacity(0.3)),
           child: const Center(child: Text("כאן ימוקמו\nמשולשי הלוח והכלים", textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 30))),
         ),
 
-        // הקוביות שלי יופיעו במרכז המסך אם זה תורי!
         if (_currentTurnId == widget.myPlayFabId)
           if (!_hasRolledThisTurn)
              ElevatedButton(
@@ -442,7 +445,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
-  // פונקציית עזר לציור קוביות יפות
   Widget _buildDice(int value, {double size = 50}) {
     return Container(
       width: size, height: size,

@@ -139,22 +139,28 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Stack(
                     children: [
                       // כפתור "מי אנחנו" בצד ימין למעלה (בגלל שזה RTL)
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const AboutScreen()),
-                              );
-                            },
-                            child: _buildCustomButton("מי אנחנו", width: aboutButtonWidth, isSmall: true),
+                      // כפתור "מי אנחנו" - קטן ובצד ימין למעלה
+                    Positioned(
+                      top: 10,
+                      right: 15,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AboutScreen()),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.white, width: 1.5),
                           ),
+                          child: const Text("מי אנחנו", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                         ),
                       ),
-
+                    ),
                       // מסך קבוע ללא גלילה! משתמשים ב-Spacer כדי לחלק את הגובה באופן יחסי
                       Column(
                         children: [
