@@ -42,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isIncomingDuelOpen = false;
   BuildContext? waitingDialogContext;
 
-  // --- התקנון המלא שהוחזר ---
   final String termsOfServiceMarkdown = '''
 תקנון ותנאי שימוש באפליקציית BeshLeague
 
@@ -268,7 +267,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           setState(() {
-            // התיקון הקריטי: משתמשים *רק* בשם המשתמש (Username) בכל מקום!
             playfabUsername = userInfo['Username'] ?? "שחקן"; 
             userEmail = privateInfo?['Email'] ?? ""; 
             coins = fetchedCoins;
@@ -305,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return Dialog(
               backgroundColor: Colors.transparent,
               child: Container(
-                width: size.width * 0.5,
+                width: size.width * 0.55, 
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E2328).withOpacity(0.95), 
@@ -325,19 +323,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             onPressed: () => Navigator.of(ctx).pop(),
                           ),
                         ),
-                        const Text("הזמנה לדו-קרב", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+                        const FittedBox(fit: BoxFit.scaleDown, child: Text("הזמנה לדו-קרב", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white))),
                       ],
                     ),
                     const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text("אני", style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold)),
-                        const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text("VS", style: TextStyle(fontSize: 36, color: Colors.amber, fontWeight: FontWeight.bold))),
-                        Text(friendUsername, style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold)),
+                        const Text("אני", style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+                        const Padding(padding: EdgeInsets.symmetric(horizontal: 15), child: Text("VS", style: TextStyle(fontSize: 30, color: Colors.amber, fontWeight: FontWeight.bold))),
+                        Text(friendUsername, style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
                       ],
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 25),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -346,12 +344,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildBetOption(200, selectedBet, () => setStateDialog(() => selectedBet = 200)),
                       ],
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 25),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28559A),
-                        padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
                       onPressed: () {
                         if (coins < selectedBet) {
@@ -362,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.of(ctx).pop(); 
                         _sendDuelInviteToServer(friendUsername, selectedBet);
                       },
-                      child: const Text("הזמן", style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: const Text("הזמן", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -387,18 +385,18 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFC4E4F5) : Colors.black, 
           borderRadius: BorderRadius.circular(30),
           border: Border.all(color: canAfford ? Colors.amber : Colors.grey, width: 2),
-          boxShadow: isSelected ? [const BoxShadow(color: Colors.blueAccent, blurRadius: 10)] : [],
+          boxShadow: isSelected ? [const BoxShadow(color: Colors.blueAccent, blurRadius: 8)] : [],
         ),
         child: Row(
           children: [
-            Icon(Icons.monetization_on, color: canAfford ? Colors.amber : Colors.grey, size: 28),
-            const SizedBox(width: 8),
-            Text("$amount", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isSelected ? Colors.black : (canAfford ? Colors.white : Colors.grey))),
+            Icon(Icons.monetization_on, color: canAfford ? Colors.amber : Colors.grey, size: 22),
+            const SizedBox(width: 5),
+            Text("$amount", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isSelected ? Colors.black : (canAfford ? Colors.white : Colors.grey))),
           ],
         ),
       ),
@@ -414,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final accountRes = await http.post(
         accountUrl,
         headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-        body: json.encode({"Username": targetUsername}), // כאן היה השגיאה קודם, עכשיו ה-targetUsername הוא תמיד Username חוקי!
+        body: json.encode({"Username": targetUsername}), 
       );
       final accountData = json.decode(accountRes.body);
 
@@ -455,8 +453,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
-            width: size.width * 0.4,
-            padding: const EdgeInsets.all(30),
+            width: size.width * 0.45,
+            padding: const EdgeInsets.all(25),
             decoration: BoxDecoration(
               color: const Color(0xFF1E2328).withOpacity(0.95),
               borderRadius: BorderRadius.circular(20),
@@ -468,7 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Align(
                   alignment: Alignment.topLeft,
                   child: IconButton(
-                    icon: const Icon(Icons.close, size: 30, color: Colors.white),
+                    icon: const Icon(Icons.close, size: 28, color: Colors.white),
                     onPressed: () {
                       waitingDialogContext = null;
                       _clearDuelStatus(); 
@@ -479,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const CircularProgressIndicator(color: Colors.amber),
                 const SizedBox(height: 20),
-                Text("ממתין לאישור מ-$friendUsername...", style: const TextStyle(fontSize: 22, color: Colors.white)),
+                Text("ממתין לאישור מ-$friendUsername...", textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, color: Colors.white)),
               ],
             ),
           ),
@@ -497,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
-            width: size.width * 0.4,
+            width: size.width * 0.5,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: const Color(0xFF1E2328).withOpacity(0.95),
@@ -521,33 +519,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                     ),
-                    const Text("הזמנה לדו-קרב", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const FittedBox(fit: BoxFit.scaleDown, child: Text("הזמנה לדו-קרב", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white))),
                   ],
                 ),
                 const SizedBox(height: 20),
                 
-                Text('"$senderUsername" הזמין אותך לדו קרב', style: const TextStyle(fontSize: 24, color: Colors.white)),
+                Text('"$senderUsername" הזמין אותך לדו קרב', textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, color: Colors.white)),
                 const SizedBox(height: 20),
 
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
                   decoration: BoxDecoration(color: const Color(0xFFC4E4F5), borderRadius: BorderRadius.circular(30)),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.monetization_on, color: Colors.amber, size: 35),
-                      const SizedBox(width: 10),
-                      Text("$incomingBet", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black)),
+                      const Icon(Icons.monetization_on, color: Colors.amber, size: 30),
+                      const SizedBox(width: 8),
+                      Text("$incomingBet", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black)),
                     ],
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 25),
 
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF28559A),
-                    padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),
                   onPressed: () {
                     isIncomingDuelOpen = false;
@@ -559,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _respondToDuelInvite(senderUsername, senderId, true); 
                     }
                   },
-                  child: const Text("אישור", style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: const Text("אישור", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -638,7 +636,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: MediaQuery.of(context).size.width * 0.2, padding: const EdgeInsets.symmetric(vertical: 10),
+                  width: MediaQuery.of(context).size.width * 0.25, padding: const EdgeInsets.symmetric(vertical: 5),
                   decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.grey, width: 2)),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -663,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMenuButton(String text, VoidCallback onTap) {
-    return Container(width: double.infinity, margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), decoration: BoxDecoration(border: Border.all(color: Colors.grey, width: 1)), child: Material(color: Colors.black, child: InkWell(onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 18))))));
+    return Container(width: double.infinity, margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), decoration: BoxDecoration(border: Border.all(color: Colors.grey, width: 1)), child: Material(color: Colors.black, child: InkWell(onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: FittedBox(fit: BoxFit.scaleDown, child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16)))))));
   }
 
   void _showFriendRequestsDialog() {
@@ -676,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return Dialog(
               backgroundColor: Colors.transparent,
               child: Container(
-                width: size.width * 0.45, constraints: BoxConstraints(maxHeight: size.height * 0.7), padding: const EdgeInsets.all(15),
+                width: size.width * 0.5, constraints: BoxConstraints(maxHeight: size.height * 0.8), padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(color: const Color(0xFFC4E4F5), border: Border.all(color: Colors.white, width: 3)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min, 
@@ -685,7 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       alignment: Alignment.center,
                       children: [
                         Align(alignment: Alignment.topLeft, child: IconButton(icon: const Icon(Icons.close, size: 28, color: Colors.black), onPressed: () => Navigator.of(ctx).pop())),
-                        const Text("בקשות חברות", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
+                        const Text("בקשות חברות", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
                       ],
                     ),
                     const Divider(color: Colors.white, thickness: 2),
@@ -705,7 +703,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(width: 8),
                                   SizedBox(height: 30, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.lightGreen, padding: const EdgeInsets.symmetric(horizontal: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), onPressed: () { _handleFriendRequest(requestUsername, index, setStateDialog, true); }, child: const Text("אישור", style: TextStyle(color: Colors.white, fontSize: 12)))),
                                   const Spacer(),
-                                  Text(requestUsername, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                  Text(requestUsername, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             );
@@ -738,11 +736,11 @@ class _HomeScreenState extends State<HomeScreen> {
             return Dialog(
               backgroundColor: Colors.transparent,
               child: Container(
-                width: size.width * 0.45, 
+                width: size.width * 0.6, 
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
                   color: const Color(0xFF7A8D9B).withOpacity(0.95), 
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.black, width: 2),
                 ),
                 child: SingleChildScrollView(
@@ -754,20 +752,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Align(
                             alignment: Alignment.topLeft,
-                            child: IconButton(icon: const Icon(Icons.close, size: 30, color: Colors.black54), onPressed: () { Navigator.of(ctx).pop(); Navigator.of(context).pop(); }),
+                            child: IconButton(icon: const Icon(Icons.close, size: 28, color: Colors.black54), onPressed: () { Navigator.of(ctx).pop(); Navigator.of(context).pop(); }),
                           ),
-                          const Text("תמיכה", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black)),
+                          const Text("תמיכה", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black)),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      Row(children: [const SizedBox(width: 50, child: Text("שם", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))), Expanded(child: _buildSupportTextField(nameController, height: 40))]),
                       const SizedBox(height: 15),
-                      Row(children: [const SizedBox(width: 50, child: Text("מייל", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))), Expanded(child: _buildSupportTextField(emailController, height: 40))]),
-                      const SizedBox(height: 20),
-                      _buildSupportTextField(messageController, height: 120, maxLines: 5),
-                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          const SizedBox(width: 40, child: Text("שם", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))), 
+                          Expanded(child: _buildSupportTextField(nameController))
+                        ]
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const SizedBox(width: 40, child: Text("מייל", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))), 
+                          Expanded(child: _buildSupportTextField(emailController))
+                        ]
+                      ),
+                      const SizedBox(height: 15),
+                      _buildSupportTextField(messageController, maxLines: 4),
+                      const SizedBox(height: 15),
                       ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5))),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5))),
                         onPressed: isSending ? null : () async {
                           if (messageController.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אנא כתוב הודעה.", textAlign: TextAlign.right))); return; }
                           setStateDialog(() => isSending = true); 
@@ -780,7 +788,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             }
                           } catch (e) { setStateDialog(() => isSending = false); }
                         },
-                        child: isSending ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח", style: TextStyle(color: Colors.white, fontSize: 18)),
+                        child: isSending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח", style: TextStyle(color: Colors.white, fontSize: 16)),
                       ),
                     ],
                   ),
@@ -801,17 +809,17 @@ class _HomeScreenState extends State<HomeScreen> {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
-            width: size.width * 0.45, 
-            height: size.height * 0.7, 
+            width: size.width * 0.6, 
+            height: size.height * 0.8, 
             padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(color: const Color(0xFF7A8D9B).withOpacity(0.95), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.black, width: 2)),
+            decoration: BoxDecoration(color: const Color(0xFF7A8D9B).withOpacity(0.95), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
             child: Column(
               children: [
                 Stack(
                   alignment: Alignment.center,
                   children: [
-                    Align(alignment: Alignment.topLeft, child: IconButton(icon: const Icon(Icons.close, size: 30, color: Colors.black54), onPressed: () { Navigator.of(ctx).pop(); Navigator.of(context).pop(); })),
-                    const Text("תקנון", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black)),
+                    Align(alignment: Alignment.topLeft, child: IconButton(icon: const Icon(Icons.close, size: 28, color: Colors.black54), onPressed: () { Navigator.of(ctx).pop(); Navigator.of(context).pop(); })),
+                    const Text("תקנון", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black)),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -821,16 +829,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Markdown(
                     data: termsOfServiceMarkdown, 
                     styleSheet: MarkdownStyleSheet(
-                      p: const TextStyle(fontSize: 16, color: Colors.white, height: 1.6), 
+                      p: const TextStyle(fontSize: 14, color: Colors.white, height: 1.5), 
                       strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black), 
-                      h2: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black, height: 2), 
-                      h3: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black), 
-                      listBullet: const TextStyle(fontSize: 16, color: Colors.white), 
+                      h2: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black, height: 1.5), 
+                      h3: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black), 
+                      listBullet: const TextStyle(fontSize: 14, color: Colors.white), 
                     ),
                   ),
                 ),
                 const SizedBox(height: 5),
-                const Icon(Icons.arrow_downward, color: Colors.white, size: 28),
+                const Icon(Icons.arrow_downward, color: Colors.white, size: 24),
               ],
             ),
           ),
@@ -839,16 +847,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSupportTextField(TextEditingController controller, {required double height, int maxLines = 1}) {
+  Widget _buildSupportTextField(TextEditingController controller, {int maxLines = 1}) {
     return Container(
-      height: height,
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black, width: 2)),
-      child: TextField(controller: controller, maxLines: maxLines, textAlign: TextAlign.right, decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10))),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black, width: 1.5)),
+      child: TextField(
+        controller: controller, 
+        maxLines: maxLines, 
+        textAlign: TextAlign.right, 
+        style: const TextStyle(fontSize: 14),
+        decoration: const InputDecoration(
+          border: InputBorder.none, 
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)
+        )
+      ),
     );
   }
 
   Widget _buildTableCell(String text, bool isHeader) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Center(child: Text(text, style: TextStyle(fontSize: isHeader ? 14 : 18, fontWeight: FontWeight.bold, color: Colors.black))));
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 6.0), child: Center(child: Text(text, style: TextStyle(fontSize: isHeader ? 12 : 16, fontWeight: FontWeight.bold, color: Colors.black))));
   }
 
   @override
@@ -858,31 +875,57 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, constraints) {
           final width = constraints.maxWidth;
           final height = constraints.maxHeight;
+          // מביא את הריווח הבטוח של הטלפון (המגרעת של המצלמה וכו')
+          final safePadding = MediaQuery.of(context).padding;
 
           return Stack(
             children: [
               Image.asset('assets/background_light.png', fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-              SafeArea(
-                child: Column(
-                  children: [
-                    _buildTopBar(width, height),
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.all(width * 0.02),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(width: width * 0.25, child: _buildFriendsPanel(width, height)),
-                            SizedBox(width: width * 0.02),
-                            Expanded(child: _buildCenterProfile(width, height)),
-                            SizedBox(width: width * 0.02),
-                            SizedBox(width: width * 0.15, child: _buildLeftMenu(width, height)),
-                          ],
+              
+              // מחלקים את המסך לפס שחור עליון (שנדבק לקצה) ולשאר המסך (עם העוגנים)
+              Column(
+                children: [
+                  // הפס השחור כולל את השטח הבטוח, ולכן ידבק בדיוק למעלה!
+                  _buildTopBar(width, height, safePadding),
+                  
+                  // כל שאר המסך מתחת לפס השחור מקבל Stack כדי להצמיד פאנלים
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        // --- פאנל ימין (חברים): צמוד לחלוטין לימין ---
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: SizedBox(
+                            width: width * 0.28, 
+                            child: _buildFriendsPanel(width, height)
+                          ),
                         ),
-                      ),
+                        
+                        // --- תפריט שמאלי: צמוד לחלוטין לשמאל (עם טיפה ריווח) ---
+                        Positioned(
+                          left: 10,
+                          top: height * 0.02,
+                          bottom: height * 0.02,
+                          child: SizedBox(
+                            width: width * 0.12, 
+                            child: _buildLeftMenu(width, height)
+                          ),
+                        ),
+
+                        // --- הפרופיל המרכזי: צף בדיוק באמצע אבל מעט למעלה ---
+                        Align(
+                          alignment: const Alignment(0.0, -0.6), 
+                          child: SizedBox(
+                            width: width * 0.45,
+                            child: _buildCenterProfile(width, height),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           );
@@ -891,25 +934,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTopBar(double width, double height) {
+  Widget _buildTopBar(double width, double height, EdgeInsets safePadding) {
     return Container(
-      width: double.infinity, height: height * 0.12, color: Colors.black, padding: EdgeInsets.symmetric(horizontal: width * 0.02),
+      width: double.infinity, 
+      height: height * 0.12 + safePadding.top, 
+      color: Colors.black, 
+      padding: EdgeInsets.only(top: safePadding.top, left: width * 0.02, right: width * 0.02),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(playfabUsername, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const Text("סטטוס ליגה - (אני מעדכנת)", style: TextStyle(color: Colors.white, fontSize: 18)),
-          Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 30), const SizedBox(width: 5), Text("$coins מטבעות", style: const TextStyle(color: Colors.white, fontSize: 18))]),
-          Row(children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 30), const SizedBox(width: 5), Text("$trophies גביעים", style: const TextStyle(color: Colors.white, fontSize: 18))]),
-          IconButton(icon: const Icon(Icons.settings, color: Colors.white, size: 35), onPressed: _showSettingsMenu),
-          Image.asset('assets/logo.png', height: height * 0.1),
+          Text(playfabUsername, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text("סטטוס ליגה - (אני מעדכנת)", style: TextStyle(color: Colors.white, fontSize: 16)),
+          Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$coins מטבעות", style: const TextStyle(color: Colors.white, fontSize: 16))]),
+          Row(children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$trophies גביעים", style: const TextStyle(color: Colors.white, fontSize: 16))]),
+          IconButton(icon: const Icon(Icons.settings, color: Colors.white, size: 28), onPressed: _showSettingsMenu),
+          Image.asset('assets/logo.png', height: height * 0.08),
         ],
       ),
     );
   }
 
   Widget _buildLeftMenu(double width, double height) {
-    final buttonSize = height * 0.14; 
+    final buttonSize = height * 0.12; 
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -923,20 +969,21 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         Container(
-          width: double.infinity, height: height * 0.18,
+          width: double.infinity, height: height * 0.16,
           decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFE040FB), Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
-          child: const Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text("שחק", style: TextStyle(color: Colors.white, fontSize: 35, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)))),
+          child: const Center(child: FittedBox(fit: BoxFit.scaleDown, child: Padding(padding: EdgeInsets.all(8.0), child: Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic))))),
         ),
       ],
     );
   }
 
   Widget _buildSquareMenuButton(IconData icon, Color color, double size) {
-    return Container(width: size, height: size, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black, width: 2)), child: Icon(icon, size: size * 0.6, color: Colors.black));
+    return Container(width: size, height: size, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black, width: 2)), child: Icon(icon, size: size * 0.5, color: Colors.black));
   }
 
   Widget _buildCenterProfile(double width, double height) {
     return Column(
+      mainAxisSize: MainAxisSize.min, // קריטי כדי שהפרופיל לא יימתח על כל המסך
       children: [
         Container(
           width: double.infinity, 
@@ -945,7 +992,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: Colors.white.withOpacity(0.85), 
             borderRadius: BorderRadius.circular(15)
           ),
-          padding: const EdgeInsets.all(15),
+          padding: const EdgeInsets.all(12),
           child: Column(
             children: [
               Row(
@@ -955,27 +1002,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     clipBehavior: Clip.none,
                     children: [
                       Container(
-                        width: height * 0.18, 
-                        height: height * 0.18, 
+                        width: height * 0.16, 
+                        height: height * 0.16, 
                         decoration: BoxDecoration(color: Colors.grey[400], border: Border.all(color: Colors.white, width: 3)), 
-                        child: Icon(Icons.person, size: height * 0.12, color: Colors.grey[600])
+                        child: Icon(Icons.person, size: height * 0.1, color: Colors.grey[600])
                       ),
                       Positioned(
                         bottom: -5, right: -10, 
-                        child: Row(children: const [Icon(Icons.favorite, color: Colors.blueAccent, size: 20), Icon(Icons.favorite, color: Colors.purple, size: 30)])
+                        child: Row(children: const [Icon(Icons.favorite, color: Colors.blueAccent, size: 16), Icon(Icons.favorite, color: Colors.purple, size: 24)])
                       ),
                     ],
                   ),
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 15),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        FittedBox(fit: BoxFit.scaleDown, child: Text(playfabUsername, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black))),
-                        const SizedBox(height: 5),
-                        FittedBox(fit: BoxFit.scaleDown, child: Text("התחברות אחרונה - $lastLogin", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87))),
-                        const SizedBox(height: 10),
-                        FittedBox(fit: BoxFit.scaleDown, child: Text("השתתפות בליגות: $leaguesPlayed", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black))),
+                        FittedBox(fit: BoxFit.scaleDown, child: Text(playfabUsername, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black))),
+                        const SizedBox(height: 2),
+                        FittedBox(fit: BoxFit.scaleDown, child: Text("התחברות אחרונה - $lastLogin", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
+                        const SizedBox(height: 8),
+                        FittedBox(fit: BoxFit.scaleDown, child: Text("השתתפות בליגות: $leaguesPlayed", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black))),
                       ],
                     ),
                   ),
@@ -983,7 +1030,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const Spacer(),
               Container(
-                width: width * 0.22, 
+                width: width * 0.25, 
                 color: Colors.white,
                 child: Table(
                   border: TableBorder.all(color: Colors.black, width: 2),
@@ -999,9 +1046,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.emoji_events, color: Colors.amber, size: 45),
+                    const Icon(Icons.emoji_events, color: Colors.amber, size: 35),
                     const SizedBox(width: 10),
-                    Text("X  $trophies", style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black)),
+                    Text("X  $trophies", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black)),
                   ],
                 ),
               ),
@@ -1009,15 +1056,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         
-        const Spacer(),
+        SizedBox(height: height * 0.05), // מרווח יחסי
         
         Container(
-          width: width * 0.3, height: height * 0.12, decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
-          child: const Row(
+          width: width * 0.35, height: height * 0.12, decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.ondemand_video, size: 40), SizedBox(width: 10),
-              Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text("קבל 50 מטבעות", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), Text("נותרו 2 צפיות", style: TextStyle(fontSize: 14))]),
+              const Icon(Icons.ondemand_video, size: 30), const SizedBox(width: 8),
+              Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Text("קבל 50 מטבעות", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Text("נותרו 2 צפיות", style: TextStyle(fontSize: 12))]),
             ],
           ),
         ),
@@ -1031,16 +1078,16 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           Container(
-            width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 10), color: Colors.transparent,
+            width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 5), color: Colors.transparent,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                const Text("חברים", textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                const Text("חברים", textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 Positioned(
-                  left: 10, 
+                  left: 5, 
                   child: Stack( 
                     children: [
-                      IconButton(icon: const Icon(Icons.person_add_alt_1, size: 30, color: Colors.black), onPressed: _showFriendRequestsDialog),
+                      IconButton(icon: const Icon(Icons.person_add_alt_1, size: 24, color: Colors.black), onPressed: _showFriendRequestsDialog),
                       if (friendRequests.isNotEmpty)
                         Positioned(right: 8, top: 8, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: Text('${friendRequests.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)))),
                     ],
@@ -1054,33 +1101,34 @@ class _HomeScreenState extends State<HomeScreen> {
             child: isLoadingData
                 ? const Center(child: CircularProgressIndicator(color: Colors.black)) 
                 : friendsList.isEmpty
-                    ? const Center(child: Padding(padding: EdgeInsets.all(10.0), child: Text("אין חברים ברשימה", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))))
+                    ? const Center(child: Padding(padding: EdgeInsets.all(10.0), child: Text("אין חברים ברשימה", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))))
                     : ListView.builder(
                         itemCount: friendsList.length,
                         itemBuilder: (context, index) {
                           final friend = friendsList[index];
-                          // --- התיקון: כעת זה מציג רק את ה-Username! ---
                           final friendName = friend["Username"] ?? "שחקן";
-                          
                           final friendPlayFabId = friend["FriendPlayFabId"];
                           bool isOnline = onlineFriendIds.contains(friendPlayFabId); 
 
                           return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                             child: Row(
                               children: [
                                 if (isOnline)
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), 
-                                    onPressed: () => _showDuelInviteDialog(friendName), 
-                                    child: const Text("הזמן", style: TextStyle(color: Colors.white))
+                                  SizedBox(
+                                    height: 30,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), 
+                                      onPressed: () => _showDuelInviteDialog(friendName), 
+                                      child: const Text("הזמן", style: TextStyle(color: Colors.white, fontSize: 12))
+                                    ),
                                   )
                                 else
-                                  const SizedBox(width: 70), 
+                                  const SizedBox(width: 55), 
                                 const Spacer(),
-                                Container(width: 15, height: 15, decoration: BoxDecoration(color: isOnline ? Colors.green : Colors.redAccent, shape: BoxShape.circle)),
-                                const SizedBox(width: 10),
-                                Text(friendName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                Container(width: 12, height: 12, decoration: BoxDecoration(color: isOnline ? Colors.green : Colors.redAccent, shape: BoxShape.circle)),
+                                const SizedBox(width: 8),
+                                Flexible(child: Text(friendName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
                               ],
                             ),
                           );
@@ -1089,16 +1137,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const Divider(color: Colors.white, thickness: 3, height: 0),
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             child: Column(
               children: [
-                const Text("הוסף לפי שם משתמש", style: TextStyle(fontSize: 16)),
+                const Text("הוסף לפי שם משתמש", style: TextStyle(fontSize: 14)),
                 const SizedBox(height: 5),
                 Row(
                   children: [
-                    SizedBox(height: 35, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 10)), onPressed: _isAddingFriend ? null : _sendFriendRequest, child: _isAddingFriend ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח בקשה", style: TextStyle(color: Colors.white, fontSize: 12)))),
+                    SizedBox(height: 30, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 8)), onPressed: _isAddingFriend ? null : _sendFriendRequest, child: _isAddingFriend ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח בקשה", style: TextStyle(color: Colors.white, fontSize: 12)))),
                     const SizedBox(width: 5),
-                    Expanded(child: Container(height: 35, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black)), child: TextField(controller: _friendAddController, textAlign: TextAlign.right, decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.only(bottom: 15, right: 5))))),
+                    Expanded(child: Container(height: 30, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black)), child: TextField(controller: _friendAddController, textAlign: TextAlign.right, decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.only(bottom: 15, right: 5), isDense: true)))),
                   ],
                 ),
               ],

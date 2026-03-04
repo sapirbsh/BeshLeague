@@ -110,120 +110,139 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // הפקודה הזו מונעת מהמסך להתכווץ ולדחוס הכל כשהמקלדת קופצת
+      // מונע את כיווץ המסך כשהמקלדת נפתחת
       resizeToAvoidBottomInset: false, 
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final screenWidth = constraints.maxWidth;
-          final screenHeight = constraints.maxHeight;
+      // עוטף את המסך בכיווניות מימין לשמאל (RTL)
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final screenWidth = constraints.maxWidth;
+            final screenHeight = constraints.maxHeight;
 
-          // עדכנו את הגדלים שיהיו פרופורציונליים וטובים למסך טלפון
-          final logoWidth = screenWidth * 0.15; 
-          final buttonWidth = screenWidth * 0.22;
-          final textFieldWidth = screenWidth * 0.35;
+            final logoHeight = screenHeight * 0.22; 
+            final textFieldWidth = screenWidth * 0.35;
+            final loginButtonWidth = screenWidth * 0.15;
+            final registerButtonWidth = screenWidth * 0.18;
+            final aboutButtonWidth = screenWidth * 0.12;
 
-          return Stack(
-            children: [
-              // רקע שמתפרס על כל המסך ולא זז
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/background.png', 
-                  fit: BoxFit.cover,
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/background.png', 
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
 
-              Center(
-                child: SingleChildScrollView(
-                  // מאפשר לגלול קצת כשהמקלדת פתוחה אם צריך
-                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                SafeArea(
+                  child: Stack(
                     children: [
-                      Image.asset('assets/logo.png', width: logoWidth),
-                      const SizedBox(height: 15),
+                      // כפתור "מי אנחנו" בצד ימין למעלה (בגלל שזה RTL)
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const AboutScreen()),
+                              );
+                            },
+                            child: _buildCustomButton("מי אנחנו", width: aboutButtonWidth, isSmall: true),
+                          ),
+                        ),
+                      ),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      // מסך קבוע ללא גלילה! משתמשים ב-Spacer כדי לחלק את הגובה באופן יחסי
+                      Column(
                         children: [
-                          Column(
+                          const Spacer(flex: 2),
+
+                          Image.asset('assets/logo.png', height: logoHeight),
+                          
+                          const Spacer(flex: 1),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              _buildTextField("מייל/שם משתמש", controller: _identifierController, width: textFieldWidth),
-                              const SizedBox(height: 10),
-                              _buildTextField("סיסמה", controller: _passwordController, isPassword: true, width: textFieldWidth),
+                              // שדות הטקסט מופיעים ראשונים ולכן יהיו בימין
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildTextField("מייל/שם משתמש", controller: _identifierController, width: textFieldWidth),
+                                  const SizedBox(height: 10),
+                                  _buildTextField("סיסמה", controller: _passwordController, isPassword: true, width: textFieldWidth),
+                                ],
+                              ),
+                              
+                              const SizedBox(width: 15), 
+                              
+                              // כפתור ההתחברות מופיע שני, ולכן יהיה משמאל לשדות
+                              GestureDetector(
+                                onTap: _isLoading ? null : _loginUser,
+                                child: _isLoading 
+                                    ? const SizedBox(
+                                        width: 35, height: 35, 
+                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
+                                      ) 
+                                    : _buildCustomButton("התחבר", width: loginButtonWidth),
+                              ),
                             ],
                           ),
-                          SizedBox(width: screenWidth * 0.03), 
                           
+                          const Spacer(flex: 1),
+
+                          _buildGoogleTextButton(),
+
+                          const Spacer(flex: 1),
+
                           GestureDetector(
-                            onTap: _isLoading ? null : _loginUser,
-                            child: _isLoading 
-                                ? const CircularProgressIndicator(color: Colors.black) 
-                                : _buildCustomButton("התחברות", width: buttonWidth),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                              );
+                            },
+                            child: _buildCustomButton("הרשמה", width: registerButtonWidth),
                           ),
+                          
+                          const Spacer(flex: 2), 
                         ],
-                      ),
-                      
-                      const SizedBox(height: 25),
-
-                      _buildGoogleButton(screenWidth),
-
-                      const SizedBox(height: 15),
-
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                          );
-                        },
-                        child: _buildCustomButton("הרשמה", width: buttonWidth),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const AboutScreen()),
-                          );
-                        },
-                        child: _buildCustomButton("מי אנחנו", width: buttonWidth * 0.7, isSmall: true),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  // --- וידג'טים מעוצבים מעודכנים למובייל ---
-
   Widget _buildTextField(String hint, {required TextEditingController controller, bool isPassword = false, required double width}) {
     return Container(
       width: width,
-      // הסרנו את הגובה הקשיח, הקונטיינר יגדל לפי הטקסט וה-Padding
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: Colors.black, width: 2),
+        border: Border.all(color: Colors.black, width: 1.5), 
+        borderRadius: BorderRadius.circular(4), 
       ),
       child: TextField(
         controller: controller, 
         obscureText: isPassword,
-        textAlign: TextAlign.right, // טקסט מימין לשמאל
+        textAlign: TextAlign.right, 
         textDirection: TextDirection.rtl,
-        style: const TextStyle(fontSize: 16), // גודל פונט הגיוני לטלפון
+        style: const TextStyle(fontSize: 14),
         decoration: InputDecoration(
           hintText: hint,
-          // פדינג קבוע ויציב שלא תלוי באחוזי מסך
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           border: InputBorder.none,
           isDense: true,
-          hintStyle: const TextStyle(fontSize: 16, color: Colors.grey),
+          hintStyle: const TextStyle(fontSize: 14, color: Colors.grey),
         ),
       ),
     );
@@ -232,42 +251,47 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildCustomButton(String text, {required double width, bool isSmall = false}) {
     return Container(
       width: width,
-      // משתמשים בפדינג במקום גובה קשיח
-      padding: EdgeInsets.symmetric(vertical: isSmall ? 6 : 12),
+      padding: EdgeInsets.symmetric(vertical: isSmall ? 6 : 10),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFB4F0C0), Color(0xFFAEC6F5)],
+          colors: [Color(0xFFD0F0C0), Color(0xFFAEC6F5)], 
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black, width: 2),
+        // צורה אובלית/קפסולה לכפתורים
+        borderRadius: BorderRadius.circular(30), 
+        border: Border.all(color: Colors.black, width: 1.5),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 4))
+          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))
         ],
       ),
       child: Center(
         child: Text(
           text,
-          style: TextStyle(fontSize: isSmall ? 16 : 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: isSmall ? 14 : 18, 
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildGoogleButton(double screenWidth) {
+  Widget _buildGoogleTextButton() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.black, width: 1),
+        color: Colors.transparent, 
+        borderRadius: BorderRadius.circular(15),
       ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text("Google התחבר עם", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-        ],
+      child: const Text(
+        "התחבר עם Google", 
+        style: TextStyle(
+          fontSize: 16, 
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        )
       ),
     );
   }
