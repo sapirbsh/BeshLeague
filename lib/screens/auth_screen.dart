@@ -110,64 +110,65 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // הפקודה הזו מונעת מהמסך להתכווץ ולדחוס הכל כשהמקלדת קופצת
+      resizeToAvoidBottomInset: false, 
       body: LayoutBuilder(
         builder: (context, constraints) {
           final screenWidth = constraints.maxWidth;
           final screenHeight = constraints.maxHeight;
 
-          final logoWidth = screenWidth * 0.22; 
-          final buttonWidth = screenWidth * 0.18;
-          final textFieldWidth = screenWidth * 0.28;
-          final spacing = screenHeight * 0.04;
+          // עדכנו את הגדלים שיהיו פרופורציונליים וטובים למסך טלפון
+          final logoWidth = screenWidth * 0.15; 
+          final buttonWidth = screenWidth * 0.22;
+          final textFieldWidth = screenWidth * 0.35;
 
           return Stack(
             children: [
-              Image.asset(
-                'assets/background.png', 
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
+              // רקע שמתפרס על כל המסך ולא זז
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/background.png', 
+                  fit: BoxFit.cover,
+                ),
               ),
 
               Center(
                 child: SingleChildScrollView(
+                  // מאפשר לגלול קצת כשהמקלדת פתוחה אם צריך
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Image.asset('assets/logo.png', width: logoWidth),
-                      SizedBox(height: spacing),
+                      const SizedBox(height: 15),
 
-                      // --- כאן נמצא התיקון! הפכנו את הסדר של הפריטים בתוך השורה ---
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // 1. קודם שדות הטקסט (יופיעו בימין בגלל העברית)
                           Column(
                             children: [
-                              _buildTextField("מייל/שם משתמש", controller: _identifierController, width: textFieldWidth, height: screenHeight * 0.08),
-                              SizedBox(height: spacing * 0.3),
-                              _buildTextField("סיסמה", controller: _passwordController, isPassword: true, width: textFieldWidth, height: screenHeight * 0.08),
+                              _buildTextField("מייל/שם משתמש", controller: _identifierController, width: textFieldWidth),
+                              const SizedBox(height: 10),
+                              _buildTextField("סיסמה", controller: _passwordController, isPassword: true, width: textFieldWidth),
                             ],
                           ),
-                          SizedBox(width: screenWidth * 0.03), // רווח בין השדות לכפתור
+                          SizedBox(width: screenWidth * 0.03), 
                           
-                          // 2. אחרי זה כפתור ההתחברות (יופיע בשמאל)
                           GestureDetector(
                             onTap: _isLoading ? null : _loginUser,
                             child: _isLoading 
                                 ? const CircularProgressIndicator(color: Colors.black) 
-                                : _buildCustomButton("התחברות", width: buttonWidth, height: screenHeight * 0.12),
+                                : _buildCustomButton("התחברות", width: buttonWidth),
                           ),
                         ],
                       ),
                       
-                      SizedBox(height: spacing * 1.5),
+                      const SizedBox(height: 25),
 
-                      _buildGoogleButton(screenWidth, screenHeight),
+                      _buildGoogleButton(screenWidth),
 
-                      SizedBox(height: spacing * 0.8),
+                      const SizedBox(height: 15),
 
-                      // כפתור הרשמה
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -175,12 +176,11 @@ class _AuthScreenState extends State<AuthScreen> {
                             MaterialPageRoute(builder: (context) => const RegisterScreen()),
                           );
                         },
-                        child: _buildCustomButton("הרשמה", width: buttonWidth, height: screenHeight * 0.12),
+                        child: _buildCustomButton("הרשמה", width: buttonWidth),
                       ),
 
-                      SizedBox(height: spacing * 0.5),
+                      const SizedBox(height: 10),
 
-                      // כפתור "מי אנחנו" המוקטן
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -188,7 +188,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             MaterialPageRoute(builder: (context) => const AboutScreen()),
                           );
                         },
-                        child: _buildCustomButton("מי אנחנו", width: buttonWidth * 0.7, height: screenHeight * 0.08),
+                        child: _buildCustomButton("מי אנחנו", width: buttonWidth * 0.7, isSmall: true),
                       ),
                     ],
                   ),
@@ -201,12 +201,12 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  // --- ווידג'טים מעוצבים ---
+  // --- וידג'טים מעוצבים מעודכנים למובייל ---
 
-  Widget _buildTextField(String hint, {required TextEditingController controller, bool isPassword = false, required double width, required double height}) {
+  Widget _buildTextField(String hint, {required TextEditingController controller, bool isPassword = false, required double width}) {
     return Container(
       width: width,
-      height: height,
+      // הסרנו את הגובה הקשיח, הקונטיינר יגדל לפי הטקסט וה-Padding
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.black, width: 2),
@@ -214,29 +214,34 @@ class _AuthScreenState extends State<AuthScreen> {
       child: TextField(
         controller: controller, 
         obscureText: isPassword,
-        textAlign: TextAlign.right,
+        textAlign: TextAlign.right, // טקסט מימין לשמאל
+        textDirection: TextDirection.rtl,
+        style: const TextStyle(fontSize: 16), // גודל פונט הגיוני לטלפון
         decoration: InputDecoration(
           hintText: hint,
-          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: height * 0.2),
+          // פדינג קבוע ויציב שלא תלוי באחוזי מסך
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           border: InputBorder.none,
-          hintStyle: TextStyle(fontSize: height * 0.35, color: Colors.grey),
+          isDense: true,
+          hintStyle: const TextStyle(fontSize: 16, color: Colors.grey),
         ),
       ),
     );
   }
 
-  Widget _buildCustomButton(String text, {required double width, required double height}) {
+  Widget _buildCustomButton(String text, {required double width, bool isSmall = false}) {
     return Container(
       width: width,
-      height: height,
+      // משתמשים בפדינג במקום גובה קשיח
+      padding: EdgeInsets.symmetric(vertical: isSmall ? 6 : 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFB4F0C0), Color(0xFFAEC6F5)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(height * 0.4),
-        border: Border.all(color: Colors.black, width: 2.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black, width: 2),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 4))
         ],
@@ -244,24 +249,24 @@ class _AuthScreenState extends State<AuthScreen> {
       child: Center(
         child: Text(
           text,
-          style: TextStyle(fontSize: height * 0.35, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: isSmall ? 16 : 20, fontWeight: FontWeight.bold),
         ),
       ),
     );
   }
 
-  Widget _buildGoogleButton(double screenWidth, double screenHeight) {
+  Widget _buildGoogleButton(double screenWidth) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04, vertical: screenHeight * 0.015),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.black, width: 1),
       ),
-      child: Row(
+      child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text("Google התחבר עם", style: TextStyle(fontSize: screenHeight * 0.035, fontWeight: FontWeight.w500)),
+          Text("Google התחבר עם", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
         ],
       ),
     );
