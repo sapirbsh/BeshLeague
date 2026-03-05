@@ -5,8 +5,9 @@ import 'dart:async';
 import 'package:flutter_markdown/flutter_markdown.dart'; 
 import 'package:besh_league/screens/auth_screen.dart';
 import 'package:besh_league/screens/about_screen.dart'; 
-import 'package:besh_league/screens/pre_game_screen.dart'; 
-import 'package:besh_league/screens/game_board_screen.dart';
+import 'package:besh_league/screens/pre_game_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 class HomeScreen extends StatefulWidget {
   final String sessionTicket;
@@ -21,7 +22,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String playfabUsername = "טוען..."; 
   String userEmail = ""; 
-  
+  bool _isFriendsPanelOpen = false; // שולט האם פאנל החברים מוצג
   int coins = 0;
   int trophies = 0; 
   String lastLogin = "טוען...";
@@ -230,11 +231,15 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => PreGameScreen(
+                  sessionTicket: widget.sessionTicket,
+                  myPlayFabId: widget.playFabId,
                   myName: playfabUsername,
                   myTrophies: trophies,
                   opponentName: duelStatus!['opponent'].toString(),
-                  opponentTrophies: 0, 
+                  opponentId: duelStatus!['opponentId']?.toString() ?? "",
+                  opponentTrophies: 0,
                   betAmount: acceptedBet,
+                  roomId: duelStatus!['roomId']?.toString() ?? "",
                 ),
               ),
             );
@@ -569,8 +574,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _respondToDuelInvite(String senderUsername, String senderId, bool isAccept) async {
-    const titleId = "1A15A2"; 
-    await http.post(
+    const titleId = "1A15A2";
+    final res = await http.post(
       Uri.parse('https://$titleId.playfabapi.com/Client/ExecuteCloudScript'),
       headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
       body: json.encode({
@@ -578,6 +583,29 @@ class _HomeScreenState extends State<HomeScreen> {
         "FunctionParameter": { "SenderUsername": senderUsername, "SenderId": senderId, "IsAccept": isAccept }
       }),
     );
+
+    if (isAccept && res.statusCode == 200 && mounted) {
+      final data = json.decode(res.body)['data']?['FunctionResult'];
+      if (data != null && data['roomId'] != null) {
+        final betAmt = int.tryParse(data['betAmount']?.toString() ?? '50') ?? 50;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PreGameScreen(
+              sessionTicket: widget.sessionTicket,
+              roomId: data['roomId'].toString(),
+              myPlayFabId: widget.playFabId,
+              myName: playfabUsername,
+              myTrophies: trophies,
+              opponentName: senderUsername,
+              opponentId: senderId,
+              opponentTrophies: 0,
+              betAmount: betAmt,
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _sendFriendRequest() async {
@@ -729,8 +757,6 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (ctx) {
-        bool isSending = false; 
-
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             final size = MediaQuery.of(context).size;
@@ -777,19 +803,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 15),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5))),
-                        onPressed: isSending ? null : () async {
+                        onPressed: () async {
                           if (messageController.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אנא כתוב הודעה.", textAlign: TextAlign.right))); return; }
-                          setStateDialog(() => isSending = true); 
-                          try {
-                            final response = await http.post(Uri.parse('https://formspree.io/f/YOUR_FORM_ID_HERE'), headers: {'Content-Type': 'application/json'}, body: json.encode({'name': nameController.text, 'email': emailController.text, 'message': messageController.text}));
-                            setStateDialog(() => isSending = false);
-                            if (response.statusCode == 200 || response.statusCode == 201) {
-                              Navigator.of(ctx).pop(); Navigator.of(context).pop(); 
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("ההודעה נשלחה בהצלחה!", textAlign: TextAlign.right), backgroundColor: Colors.green));
-                            }
-                          } catch (e) { setStateDialog(() => isSending = false); }
+                          final subject = Uri.encodeComponent('פנייה מ-${nameController.text} דרך BeshLeague');
+                          final body = Uri.encodeComponent('שם: ${nameController.text}\nמייל: ${emailController.text}\n\nהודעה:\n${messageController.text}');
+                          final emailUri = Uri.parse('mailto:support@beshleague.com?subject=$subject&body=$body');
+                          final nav1 = Navigator.of(ctx);
+                          final nav2 = Navigator.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
+                          if (await canLaunchUrl(emailUri)) {
+                            await launchUrl(emailUri);
+                            nav1.pop(); nav2.pop();
+                            messenger.showSnackBar(const SnackBar(content: Text("אפליקציית המייל נפתחה!", textAlign: TextAlign.right), backgroundColor: Colors.green));
+                          } else {
+                            messenger.showSnackBar(const SnackBar(content: Text("לא ניתן לפתוח אפליקציית מייל.", textAlign: TextAlign.right), backgroundColor: Colors.redAccent));
+                          }
                         },
-                        child: isSending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח", style: TextStyle(color: Colors.white, fontSize: 16)),
+                        child: const Text("שלח", style: TextStyle(color: Colors.white, fontSize: 16)),
                       ),
                     ],
                   ),
@@ -892,25 +922,36 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Stack(
                         children: [
-                          // פאנל חברים צמוד ימינה לגמרי
-                          Positioned(
-                            right: 0, 
-                            top: 0, 
-                            bottom: 0, 
-                            child: SizedBox(width: width * 0.28, child: _buildFriendsPanel(width, height))
-                          ),
                           // כפתורי חנות/ליגות/שחק צמודים שמאלה
                           Positioned(
-                            left: 10, 
-                            top: height * 0.02, 
-                            bottom: height * 0.02, 
+                            left: 10,
+                            top: height * 0.02,
+                            bottom: height * 0.02,
                             child: SizedBox(width: width * 0.12, child: _buildLeftMenu(width, height))
                           ),
                           // פרופיל באמצע, קצת מורם למעלה
                           Align(
-                            alignment: const Alignment(0.0, -0.6), 
+                            alignment: const Alignment(0.0, -0.6),
                             child: SizedBox(width: width * 0.45, child: _buildCenterProfile(width, height))
                           ),
+                          // כפתור חברים (מוצג כשהפאנל סגור)
+                          if (!_isFriendsPanelOpen)
+                            Positioned(
+                              right: 10,
+                              top: height * 0.02,
+                              child: GestureDetector(
+                                onTap: () => setState(() => _isFriendsPanelOpen = true),
+                                child: _buildFriendsButton(height),
+                              ),
+                            ),
+                          // פאנל חברים צף (מוצג כשפתוח)
+                          if (_isFriendsPanelOpen)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              child: SizedBox(width: width * 0.28, child: _buildFriendsPanel(width, height)),
+                            ),
                         ],
                       ),
                     ),
@@ -931,7 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(playfabUsername, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-          const Text("סטטוס ליגה - (אני מעדכנת)", style: TextStyle(color: Colors.white, fontSize: 16)),
+          const Text("ליגה - בקרוב", style: TextStyle(color: Colors.white54, fontSize: 16, fontStyle: FontStyle.italic)),
           Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$coins מטבעות", style: const TextStyle(color: Colors.white, fontSize: 16))]),
           Row(children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$trophies גביעים", style: const TextStyle(color: Colors.white, fontSize: 16))]),
           IconButton(icon: const Icon(Icons.settings, color: Colors.white, size: 28), onPressed: _showSettingsMenu),
@@ -998,6 +1039,36 @@ Widget _buildLeftMenu(double width, double height) {
       ],
     );
   }
+  Widget _buildFriendsButton(double height) {
+    final size = height * 0.12;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: const Color(0xFFC4E4F5),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.black, width: 2),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
+          ),
+          child: Icon(Icons.people, size: size * 0.5, color: Colors.black87),
+        ),
+        if (friendRequests.isNotEmpty)
+          Positioned(
+            right: -6,
+            top: -6,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+              child: Text('${friendRequests.length}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildSquareMenuButton(IconData icon, Color color, double size) {
     return Container(width: size, height: size, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black, width: 2)), child: Icon(icon, size: size * 0.5, color: Colors.black));
   }
@@ -1046,6 +1117,7 @@ Widget _buildLeftMenu(double width, double height) {
               children: [
                 const Text("חברים", textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 Positioned(left: 5, child: Stack(children: [IconButton(icon: const Icon(Icons.person_add_alt_1, size: 24, color: Colors.black), onPressed: _showFriendRequestsDialog), if (friendRequests.isNotEmpty) Positioned(right: 8, top: 8, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: Text('${friendRequests.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))))])),
+                Positioned(right: 5, child: IconButton(icon: const Icon(Icons.close, size: 24, color: Colors.black), onPressed: () => setState(() => _isFriendsPanelOpen = false))),
               ],
             ),
           ),

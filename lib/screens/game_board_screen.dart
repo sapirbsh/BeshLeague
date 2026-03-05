@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
 import '../services/live_game_service.dart';
+import '../services/bot_service.dart';
 
 class GameBoardScreen extends StatefulWidget {
   final String sessionTicket;
@@ -13,6 +14,7 @@ class GameBoardScreen extends StatefulWidget {
   final String opponentName;
   final int opponentTrophies;
   final int betAmount;
+  final BotSkill? botSkill;
 
   const GameBoardScreen({
     super.key,
@@ -25,6 +27,7 @@ class GameBoardScreen extends StatefulWidget {
     this.opponentName = "יריב",
     this.opponentTrophies = 15,
     this.betAmount = 50,
+    this.botSkill,
   });
 
   @override
@@ -34,6 +37,7 @@ class GameBoardScreen extends StatefulWidget {
 class _GameBoardScreenState extends State<GameBoardScreen> {
   LiveGameService? _liveGameService;
   bool _isSimulation = false;
+  bool get _isBotMatch => widget.botSkill != null;
 
   String _gameState = "initialRoll"; 
   String _currentTurnId = "";
@@ -59,7 +63,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   List<int> _board = List.filled(24, 0);
   int _myBar = 0; 
   int _oppBar = 0; 
-  int _myBorneOff = 0; 
+  int _myBorneOff = 0;
   int _oppBorneOff = 0;
   
   int? _selectedPoint; 
@@ -143,6 +147,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
              _isRolling = false;
            });
            _startTurnTimer();
+           if (_isBotMatch && _currentTurnId == widget.opponentId) {
+             _scheduleBotTurn();
+           }
          }
       });
     }
@@ -186,10 +193,91 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   void _endTurn() {
     Future.delayed(const Duration(milliseconds: 800), () {
       if (!mounted) return;
+      final nextTurn = (_currentTurnId == widget.myPlayFabId) ? widget.opponentId : widget.myPlayFabId;
+      setState(() { _currentTurnId = nextTurn; });
+      _startTurnTimer();
+      if (_isBotMatch && nextTurn == widget.opponentId) {
+        _scheduleBotTurn();
+      }
+    });
+  }
+
+  // --- Bot auto-play logic ---
+
+  void _scheduleBotTurn() {
+    final delay = BotService.getThinkDelay(widget.botSkill!);
+    Future.delayed(delay, () {
+      if (!mounted || _currentTurnId != widget.opponentId || _gameState != "playing") return;
+      _rollPlayingDiceForBot();
+    });
+  }
+
+  void _rollPlayingDiceForBot() {
+    setState(() { _isRolling = true; });
+    int rolls = 0;
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
       setState(() {
-        _currentTurnId = widget.opponentId;
-        _startTurnTimer();
+        _die1 = _random.nextInt(6) + 1;
+        _die2 = _random.nextInt(6) + 1;
       });
+      rolls++;
+      if (rolls > 15) {
+        timer.cancel();
+        setState(() {
+          _isRolling = false;
+          _hasRolledThisTurn = true;
+          _availableMoves = (_die1 == _die2) ? [_die1, _die1, _die1, _die1] : [_die1, _die2];
+        });
+        _executeBotMovesSequentially();
+      }
+    });
+  }
+
+  void _executeBotMovesSequentially() {
+    if (!mounted || _availableMoves.isEmpty || _gameState != "playing") {
+      _endTurn();
+      return;
+    }
+    final move = BotService.selectBotMove(_board, List.from(_availableMoves), _oppBar, widget.botSkill!);
+    if (move == null) { _endTurn(); return; }
+
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (!mounted || _gameState != "playing") return;
+      _executeBotMove(move.source, move.dest);
+      Future.delayed(const Duration(milliseconds: 300), _executeBotMovesSequentially);
+    });
+  }
+
+  void _executeBotMove(int source, int dest) {
+    setState(() {
+      final moveDistance = dest == 24 ? (23 - source + 1) : (dest - source);
+
+      if (dest == 24) {
+        // Bear off
+        int exact = _availableMoves.firstWhere((m) => source + m > 23, orElse: () => -1);
+        if (exact != -1) _availableMoves.remove(exact);
+        _oppBorneOff++;
+        if (source == 25) { _oppBar--; } else { _board[source]++; } // board[source] is negative, increment toward 0
+      } else {
+        _availableMoves.remove(moveDistance);
+        if (source == 25) {
+          _oppBar--;
+        } else {
+          _board[source]++; // remove one bot piece (less negative)
+        }
+
+        if (_board[dest] == 1) {
+          // Hit a human blot
+          _board[dest] = -1;
+          _myBar++;
+        } else {
+          _board[dest]--; // add bot piece (more negative)
+        }
+      }
+
+      if (_oppBorneOff == 15) {
+        _endGame(winnerName: widget.opponentName);
+      }
     });
   }
 
@@ -445,13 +533,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           if (isOpponentTurn) ...[const Icon(Icons.hourglass_bottom, color: Colors.white, size: 28), Text("$_timeLeft", style: TextStyle(color: _timeLeft <= 10 ? Colors.red : Colors.white, fontSize: 32, fontWeight: FontWeight.bold))] else const SizedBox(height: 60),
           const SizedBox(height: 10),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.close, color: _opponentStrikes >= 1 ? Colors.red : Colors.grey.withOpacity(0.5), size: 30), const SizedBox(width: 5), Icon(Icons.close, color: _opponentStrikes >= 2 ? Colors.red : Colors.grey.withOpacity(0.5), size: 30)]),
-          const SizedBox(height: 15),
-          if (_isSimulation && isOpponentTurn)
-             ElevatedButton(
-               style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-               onPressed: () => setState(() { _currentTurnId = widget.myPlayFabId; _startTurnTimer(); }),
-               child: const Text("דלג תור יריב", style: TextStyle(fontSize: 12, color: Colors.white)),
-             ),
           const Spacer(),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class LiveGameService {
@@ -67,7 +68,7 @@ class LiveGameService {
         }),
       );
     } catch (e) {
-      print("שגיאה בעדכון השרת: $e");
+      debugPrint("שגיאה בעדכון השרת: $e");
     }
   }
 // 4. סגירת החדר בשרת (למחוק אותו כדי שלא יתפוס מקום)
@@ -86,7 +87,7 @@ class LiveGameService {
         }),
       );
     } catch (e) {
-      print("שגיאה בסגירת החדר: $e");
+      debugPrint("שגיאה בסגירת החדר: $e");
     }
   }
   // 4. סגירת החיבור כשיוצאים מהמשחק

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'game_board_screen.dart';
+import '../services/bot_service.dart';
 
 class PreGameScreen extends StatefulWidget {
   final String sessionTicket;
@@ -50,6 +51,7 @@ class _PreGameScreenState extends State<PreGameScreen> {
   String currentOpponentId = "";
   int currentOpponentTrophies = 0;
   String _activeRoomId = "";
+  BotPlayer? _currentBot;
 
   @override
   void initState() {
@@ -98,7 +100,7 @@ class _PreGameScreenState extends State<PreGameScreen> {
       } else {
         timer.cancel();
         _cancelMatchmaking();
-        Navigator.pop(context, 'timeout'); 
+        _startBotMatch();
       }
     });
   }
@@ -150,6 +152,24 @@ class _PreGameScreenState extends State<PreGameScreen> {
       headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
       body: json.encode({"FunctionName": "CancelMatchmaking"}),
     );
+  }
+
+  void _startBotMatch() {
+    final bot = BotService.getRandomBot();
+    setState(() {
+      isSearching = false;
+      currentOpponentName = bot.name;
+      currentOpponentId = "bot_${bot.name}";
+      currentOpponentTrophies = bot.trophies;
+      _activeRoomId = "";
+      _currentBot = bot;
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() { isOpponentReady = true; });
+        if (isMeReady && !isCountingDown) _startCountdownAndGo();
+      }
+    });
   }
 
   Future<void> _initRoomAndListen() async {
@@ -230,6 +250,7 @@ class _PreGameScreenState extends State<PreGameScreen> {
             opponentName: currentOpponentName,
             opponentTrophies: currentOpponentTrophies,
             betAmount: widget.betAmount,
+            botSkill: _currentBot?.skill,
           )),
         );
       }
@@ -251,25 +272,10 @@ class _PreGameScreenState extends State<PreGameScreen> {
             return Stack(
               children: [
                 Image.asset('assets/background_dark.png', fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (context, error, stackTrace) => Container(color: const Color(0xFF0A192F))),
-                
-                Positioned(
-                  top: height * 0.05, right: width * 0.03, 
-                  child: GestureDetector(
-                    onTap: () {
-                      if (isSearching) _cancelMatchmaking();
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      decoration: BoxDecoration(color: const Color(0xFFB73E3E), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
-                      child: const Text("לפרוש", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ),
 
                 Center(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: width * 0.05, vertical: height * 0.1),
+                    padding: EdgeInsets.fromLTRB(width * 0.05, height * 0.05, width * 0.05, height * 0.15),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -277,15 +283,32 @@ class _PreGameScreenState extends State<PreGameScreen> {
                         Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text("VS", style: TextStyle(fontSize: 100, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2)),
+                            const Text("VS", style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2)),
                             SizedBox(height: height * 0.02),
-                            Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 50), const SizedBox(width: 10), Text("$totalPot", style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white))]),
-                            SizedBox(height: height * 0.05),
-                            Stack(clipBehavior: Clip.none, children: [const Icon(Icons.chat_bubble, color: Colors.greenAccent, size: 50), Positioned(right: -15, bottom: -10, child: Icon(Icons.chat_bubble, color: Colors.grey[300], size: 40))]),
+                            Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 40), const SizedBox(width: 8), Text("$totalPot", style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white))]),
+                            SizedBox(height: height * 0.03),
+                            Stack(clipBehavior: Clip.none, children: [const Icon(Icons.chat_bubble, color: Colors.greenAccent, size: 40), Positioned(right: -12, bottom: -8, child: Icon(Icons.chat_bubble, color: Colors.grey[300], size: 32))]),
                           ],
                         ),
                         isSearching ? _buildSearchingColumn(height) : _buildPlayerColumn(width: width, height: height, name: currentOpponentName, trophies: currentOpponentTrophies, isMe: false, isReady: isOpponentReady),
                       ],
+                    ),
+                  ),
+                ),
+
+                Positioned(
+                  bottom: height * 0.04, left: 0, right: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        if (isSearching) _cancelMatchmaking();
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                        decoration: BoxDecoration(color: const Color(0xFFB73E3E), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
+                        child: const Text("לפרוש", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      ),
                     ),
                   ),
                 ),
@@ -310,18 +333,18 @@ class _PreGameScreenState extends State<PreGameScreen> {
         Stack(
           clipBehavior: Clip.none,
           children: [
-            Container(width: height * 0.35, height: height * 0.35, decoration: BoxDecoration(color: Colors.grey[400], border: Border.all(color: Colors.white, width: 4)), child: Icon(Icons.person, size: height * 0.25, color: Colors.grey[600])),
+            Container(width: height * 0.26, height: height * 0.26, decoration: BoxDecoration(color: Colors.grey[400], border: Border.all(color: Colors.white, width: 4)), child: Icon(Icons.person, size: height * 0.18, color: Colors.grey[600])),
             Positioned(bottom: -10, right: -15, child: Row(children: const [Icon(Icons.favorite, color: Colors.blueAccent, size: 25), Icon(Icons.favorite, color: Colors.purple, size: 40)])),
           ],
         ),
-        SizedBox(height: height * 0.05),
-        Text(name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
+        SizedBox(height: height * 0.03),
+        Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
         SizedBox(height: height * 0.01),
-        Row(children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 30), const SizedBox(width: 10), Text("$trophies", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white))]),
+        Row(children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 26), const SizedBox(width: 8), Text("$trophies", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white))]),
         SizedBox(height: height * 0.01),
-        Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 30), const SizedBox(width: 10), Text("${widget.betAmount}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white))]),
-        SizedBox(height: height * 0.05),
-        SizedBox(height: height * 0.12, child: isReady ? _buildReadySticker() : _buildStatusButton(isMe, width, height)),
+        Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 26), const SizedBox(width: 8), Text("${widget.betAmount}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white))]),
+        SizedBox(height: height * 0.03),
+        SizedBox(height: height * 0.10, child: isReady ? _buildReadySticker() : _buildStatusButton(isMe, width, height)),
       ],
     );
   }
@@ -331,7 +354,7 @@ class _PreGameScreenState extends State<PreGameScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          width: height * 0.35, height: height * 0.35,
+          width: height * 0.26, height: height * 0.26,
           decoration: BoxDecoration(color: Colors.grey[900], shape: BoxShape.circle, border: Border.all(color: Colors.white38, width: 4)),
           child: Center(
             child: Column(

@@ -124,7 +124,7 @@ class _AuthScreenState extends State<AuthScreen> {
             final textFieldWidth = screenWidth * 0.35;
             final loginButtonWidth = screenWidth * 0.15;
             final registerButtonWidth = screenWidth * 0.18;
-            final aboutButtonWidth = screenWidth * 0.12;
+            //final aboutButtonWidth = screenWidth * 0.12;
 
             return Stack(
               children: [
@@ -285,19 +285,26 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildGoogleTextButton() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.transparent, 
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: const Text(
-        "התחבר עם Google", 
-        style: TextStyle(
-          fontSize: 16, 
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        )
+    return GestureDetector(
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("התחברות עם Google - בקרוב!", textAlign: TextAlign.center)),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: const Text(
+          "התחבר עם Google",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
       ),
     );
   }
