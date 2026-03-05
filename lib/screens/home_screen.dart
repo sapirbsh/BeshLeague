@@ -1008,30 +1008,23 @@ Widget _buildLeftMenu(double width, double height) {
                }
                
                // פותח את מסך ההכנה במצב "חיפוש אקראי"
-               final result = await Navigator.push(
-                 context, 
+               await Navigator.push(
+                 context,
                  MaterialPageRoute(
                    builder: (context) => PreGameScreen(
                      sessionTicket: widget.sessionTicket,
-                     roomId: "", 
+                     roomId: "",
                      myPlayFabId: widget.playFabId,
                      myName: playfabUsername,
                      myTrophies: trophies,
                      opponentId: "",
                      opponentName: "",
                      opponentTrophies: 0,
-                     betAmount: 50, // קבוע על 50
-                     isRandomMatch: true, // מפעיל את שעון ה-20 שניות!
+                     betAmount: 50,
+                     isRandomMatch: true,
                    )
                  )
                );
-
-               // אם עברו 20 שניות - מקפיץ הודעה
-               if (result == 'timeout' && mounted) {
-                 ScaffoldMessenger.of(context).showSnackBar(
-                   const SnackBar(content: Text("לא נמצא שחקן. נסה שוב.", textAlign: TextAlign.right, style: TextStyle(fontSize: 16)), backgroundColor: Colors.orange)
-                 );
-               }
             },
             child: const Center(child: FittedBox(fit: BoxFit.scaleDown, child: Padding(padding: EdgeInsets.all(8.0), child: Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic))))),
           ),

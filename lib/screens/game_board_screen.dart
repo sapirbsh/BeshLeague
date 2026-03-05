@@ -582,73 +582,82 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                 color: const Color(0xFFFDEBCE), // צבע רקע פנימי בהיר (שמנת)
                 border: Border.all(color: const Color(0xFF3E2723), width: 2),
               ),
-              child: Row(
-                children: [
-                  // צד שמאל של הלוח
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(12 + i, isTop: true)))),
-                        SizedBox(height: 40, child: Center(child: _buildDiceArea())), 
-                        Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(11 - i, isTop: false)))),
-                      ],
-                    ),
-                  ),
-                  
-                  // האמצע (The Bar)
-                  GestureDetector(
-                    onTap: () => _handlePointTap(24),
-                    child: Container(
-                      width: 40, // ציר עץ אמיתי באמצע
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF4A2F1D), Color(0xFF6B4226), Color(0xFF4A2F1D)],
+              child: LayoutBuilder(
+                builder: (ctx, innerC) {
+                  const double barW = 40, bornOffW = 55;
+                  final double pointAreaW = innerC.maxWidth - barW - bornOffW;
+                  final double pointW = pointAreaW / 12;
+                  final double colH = (innerC.maxHeight - 42) / 2;
+                  final double cs = min(pointW * 0.86, colH / 5.4).clamp(10.0, 36.0);
+
+                  return Row(
+                    children: [
+                      // צד שמאל של הלוח
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(12 + i, isTop: true, cs: cs)))),
+                            SizedBox(height: 42, child: Center(child: _buildDiceArea(cs: cs))),
+                            Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(11 - i, isTop: false, cs: cs)))),
+                          ],
                         ),
-                        border: const Border.symmetric(vertical: BorderSide(color: Color(0xFF2E1C11), width: 3)),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 5, spreadRadius: 1)],
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          if (_oppBar > 0) ...List.generate(_oppBar, (i) => _buildChecker(false)),
-                          if (_selectedPoint == 24) Container(width: 30, height: 30, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.yellow, width: 3))), 
-                          if (_myBar > 0) ...List.generate(_myBar, (i) => _buildChecker(true)),
-                        ],
-                      ),
-                    ),
-                  ),
 
-                  // צד ימין של הלוח (הבית)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(18 + i, isTop: true)))),
-                        const SizedBox(height: 40), 
-                        Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(5 - i, isTop: false)))),
-                      ],
-                    ),
-                  ),
+                      // האמצע (The Bar)
+                      GestureDetector(
+                        onTap: () => _handlePointTap(24),
+                        child: Container(
+                          width: barW,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF4A2F1D), Color(0xFF6B4226), Color(0xFF4A2F1D)]),
+                            border: const Border.symmetric(vertical: BorderSide(color: Color(0xFF2E1C11), width: 3)),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 5, spreadRadius: 1)],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              if (_oppBar > 0) ...List.generate(_oppBar, (i) => _buildChecker(false, size: cs)),
+                              if (_selectedPoint == 24) Container(width: cs, height: cs, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.yellow, width: 3))),
+                              if (_myBar > 0) ...List.generate(_myBar, (i) => _buildChecker(true, size: cs)),
+                            ],
+                          ),
+                        ),
+                      ),
 
-                  // אזור הוצאת כלים (Borne Off)
-                  GestureDetector(
-                    onTap: () => _handlePointTap(-1),
-                    child: Container(
-                      width: 55, 
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3E2723), 
-                        border: const Border(left: BorderSide(color: Color(0xFF2E1C11), width: 4)),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, spreadRadius: 1, offset: const Offset(-2, 0))],
+                      // צד ימין של הלוח (הבית)
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(18 + i, isTop: true, cs: cs)))),
+                            const SizedBox(height: 42),
+                            Expanded(child: Row(children: List.generate(6, (i) => _buildPoint(5 - i, isTop: false, cs: cs)))),
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (_validDestinations.contains(-1)) Container(height: 50, color: Colors.greenAccent.withOpacity(0.5), child: const Center(child: Icon(Icons.check, color: Colors.white))),
-                          Expanded(child: Center(child: Text("יצאו: $_myBorneOff", style: const TextStyle(color: Colors.white, fontSize: 12), textAlign: TextAlign.center))),
-                        ],
+
+                      // אזור הוצאת כלים (Borne Off)
+                      GestureDetector(
+                        onTap: () => _handlePointTap(-1),
+                        child: Container(
+                          width: bornOffW,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3E2723),
+                            border: const Border(left: BorderSide(color: Color(0xFF2E1C11), width: 4)),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, spreadRadius: 1, offset: const Offset(-2, 0))],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (_validDestinations.contains(-1))
+                                Container(height: 44, color: Colors.greenAccent.withOpacity(0.5), child: const Center(child: Icon(Icons.check, color: Colors.white, size: 20))),
+                              Expanded(child: Center(child: Text("יצאו\n$_myBorneOff", style: const TextStyle(color: Colors.white, fontSize: 11), textAlign: TextAlign.center))),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  )
-                ],
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -657,33 +666,33 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
-  Widget _buildPoint(int index, {required bool isTop}) {
+  Widget _buildPoint(int index, {required bool isTop, required double cs}) {
     int checkersCount = _board[index].abs();
     bool isMine = _board[index] > 0;
     bool isSelected = _selectedPoint == index;
     bool isTarget = _validDestinations.contains(index);
 
-    // צבעים עשירים למשולשים (שמנת ובורדו עמוק)
-    Color triangleColor = (index % 2 == (isTop ? 0 : 1)) 
-        ? const Color(0xFFE8DCC4) 
-        : const Color(0xFF8B251D); 
+    Color triangleColor = (index % 2 == (isTop ? 0 : 1))
+        ? const Color(0xFFE8DCC4)
+        : const Color(0xFF8B251D);
 
     return Expanded(
       child: GestureDetector(
         onTap: () => _handlePointTap(index),
         child: Container(
           decoration: BoxDecoration(
-            color: isTarget ? Colors.greenAccent.withOpacity(0.4) : Colors.transparent, 
+            color: isTarget ? Colors.green.withOpacity(0.35) : Colors.transparent,
+            border: isTarget ? Border.all(color: Colors.greenAccent, width: 1.5) : null,
           ),
           child: CustomPaint(
             painter: TrianglePainter(triangleColor, isTop),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(vertical: 1),
               child: Column(
                 mainAxisAlignment: isTop ? MainAxisAlignment.start : MainAxisAlignment.end,
                 children: List.generate(checkersCount > 5 ? 5 : checkersCount, (i) {
-                  if (i == 4 && checkersCount > 5) return _buildChecker(isMine, isSelected: isSelected && i == 4, extraCount: checkersCount - 4);
-                  return _buildChecker(isMine, isSelected: isSelected && i == checkersCount - 1);
+                  if (i == 4 && checkersCount > 5) return _buildChecker(isMine, isSelected: isSelected && i == 4, extraCount: checkersCount - 4, size: cs);
+                  return _buildChecker(isMine, isSelected: isSelected && i == checkersCount - 1, size: cs);
                 }),
               ),
             ),
@@ -693,84 +702,146 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
-  // כלים תלת מימדיים עם טבעת
-  Widget _buildChecker(bool isMine, {bool isSelected = false, int extraCount = 0}) {
+  Widget _buildChecker(bool isMine, {bool isSelected = false, int extraCount = 0, double size = 30}) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 1.5),
-      width: 30, height: 30, 
+      margin: EdgeInsets.symmetric(vertical: size * 0.06),
+      width: size, height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        // מראה תלת-ממדי מבריק לפלסטיק של הכלי
         gradient: RadialGradient(
-          colors: isMine 
-              ? [Colors.white, Colors.grey.shade400] 
-              : [const Color(0xFF555555), const Color(0xFF151515)], 
+          colors: isMine
+              ? [Colors.white, Colors.grey.shade300]
+              : [const Color(0xFF666666), const Color(0xFF111111)],
           center: const Alignment(-0.3, -0.3),
-          radius: 0.8,
+          radius: 0.85,
         ),
         border: Border.all(
-          color: isSelected ? Colors.yellowAccent : (isMine ? Colors.grey.shade500 : Colors.black87), 
-          width: isSelected ? 3 : 1.5
+          color: isSelected ? Colors.yellow : (isMine ? Colors.grey.shade400 : Colors.black87),
+          width: isSelected ? 3 : 1.5,
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(2, 2)),
-          BoxShadow(color: Colors.white.withOpacity(isMine ? 0.9 : 0.1), blurRadius: 1, spreadRadius: -1),
+          if (isSelected) ...[
+            const BoxShadow(color: Colors.yellow, blurRadius: 10, spreadRadius: 3),
+            const BoxShadow(color: Colors.orange, blurRadius: 5, spreadRadius: 1),
+          ],
+          BoxShadow(color: Colors.black.withOpacity(0.55), blurRadius: 3, offset: const Offset(1, 2)),
         ],
       ),
       child: Center(
         child: Container(
-          // העיגול הפנימי שנמצא בכלים מקצועיים
-          width: 16, height: 16,
+          width: size * 0.52, height: size * 0.52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: isMine ? Colors.grey.shade300 : Colors.black45, width: 1.5),
+            border: Border.all(color: isMine ? Colors.grey.shade300 : Colors.black38, width: 1.2),
           ),
-          child: extraCount > 0 
-            ? Center(child: Text("+$extraCount", style: TextStyle(color: isMine ? Colors.black : Colors.white, fontSize: 10, fontWeight: FontWeight.bold))) 
-            : null,
+          child: extraCount > 0
+              ? Center(child: Text("+$extraCount", style: TextStyle(color: isMine ? Colors.black : Colors.white, fontSize: size * 0.3, fontWeight: FontWeight.bold)))
+              : null,
         ),
       ),
     );
   }
 
-  Widget _buildDiceArea() {
+  Widget _buildDiceArea({double cs = 30}) {
+    final double diceSize = (cs * 1.15).clamp(24.0, 40.0);
     if (_currentTurnId == widget.myPlayFabId) {
       if (!_hasRolledThisTurn) {
-         return ElevatedButton(
-           style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, padding: const EdgeInsets.symmetric(horizontal: 20)),
-           onPressed: _isRolling ? null : _rollPlayingDice,
-           child: _isRolling ? const CircularProgressIndicator(color: Colors.black) : const Text("זרוק", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-         );
+        return ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.amber,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: _isRolling ? null : _rollPlayingDice,
+          child: _isRolling
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+              : const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.casino, color: Colors.black, size: 18),
+                  SizedBox(width: 5),
+                  Text("זרוק", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
+                ]),
+        );
       } else {
+        if (_die1 == _die2 && _hasRolledThisTurn) {
+          final int remaining = _availableMoves.where((m) => m == _die1).length;
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(4, (i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: _buildDice(_die1, size: diceSize * 0.85, consumed: i >= remaining),
+            )),
+          );
+        }
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDice(_die1, size: 30, consumed: !_availableMoves.contains(_die1)), 
-            const SizedBox(width: 10), 
-            _buildDice(_die2, size: 30, consumed: !_availableMoves.contains(_die2))
+            _buildDice(_die1, size: diceSize, consumed: !_availableMoves.contains(_die1)),
+            const SizedBox(width: 8),
+            _buildDice(_die2, size: diceSize, consumed: !_availableMoves.contains(_die2)),
           ],
         );
       }
     }
-    return const SizedBox(); 
+    if (_isRolling) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildDice(_die1, size: diceSize),
+          const SizedBox(width: 8),
+          _buildDice(_die2, size: diceSize),
+        ],
+      );
+    }
+    return const SizedBox();
   }
 
-  // קוביות תלת מימד עם צל
+  Widget _buildDicePips(int value, double size) {
+    final double r = size * 0.09;
+    final double L = size * 0.28, C = size * 0.5, R = size * 0.72;
+    final double T = size * 0.28, M = size * 0.5, B = size * 0.72;
+    final List<List<double>> pos;
+    switch (value) {
+      case 1: pos = [[C, M]]; break;
+      case 2: pos = [[R, T], [L, B]]; break;
+      case 3: pos = [[R, T], [C, M], [L, B]]; break;
+      case 4: pos = [[L, T], [R, T], [L, B], [R, B]]; break;
+      case 5: pos = [[L, T], [R, T], [C, M], [L, B], [R, B]]; break;
+      case 6: pos = [[L, T], [R, T], [L, M], [R, M], [L, B], [R, B]]; break;
+      default: pos = [];
+    }
+    return SizedBox(
+      width: size, height: size,
+      child: Stack(
+        children: pos.map((p) => Positioned(
+          left: p[0] - r, top: p[1] - r,
+          child: Container(width: r * 2, height: r * 2, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1A1A1A))),
+        )).toList(),
+      ),
+    );
+  }
+
   Widget _buildDice(int value, {double size = 50, bool consumed = false}) {
     return Opacity(
-      opacity: consumed ? 0.3 : 1.0, 
+      opacity: consumed ? 0.3 : 1.0,
       child: Container(
         width: size, height: size,
         decoration: BoxDecoration(
-          gradient: value == 0 
-            ? null 
-            : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.white, Color(0xFFD6D6D6)]),
-          color: value == 0 ? Colors.grey[800] : null, 
-          borderRadius: BorderRadius.circular(8), 
-          border: Border.all(color: Colors.black26, width: 1),
-          boxShadow: value == 0 ? [] : [const BoxShadow(color: Colors.black54, blurRadius: 5, offset: Offset(2, 3))],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: value == 0
+                ? [Colors.grey.shade700, Colors.grey.shade900]
+                : [const Color(0xFFFAFAFA), const Color(0xFFDDDDDD)],
+          ),
+          borderRadius: BorderRadius.circular(size * 0.18),
+          border: Border.all(color: Colors.black45, width: 1.5),
+          boxShadow: value == 0 ? [] : [
+            const BoxShadow(color: Colors.black54, blurRadius: 5, offset: Offset(2, 3)),
+            BoxShadow(color: Colors.white.withOpacity(0.8), blurRadius: 2, offset: const Offset(-1, -1)),
+          ],
         ),
-        child: Center(child: Text(value == 0 ? "?" : "$value", style: TextStyle(color: Colors.black, fontSize: size * 0.6, fontWeight: FontWeight.bold))),
+        child: value == 0
+            ? Center(child: Icon(Icons.casino_outlined, color: Colors.white54, size: size * 0.55))
+            : _buildDicePips(value, size),
       ),
     );
   }
