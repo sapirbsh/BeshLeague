@@ -75,6 +75,30 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   // Win screen
   bool _showWinScreen = false;
   bool _winnerIsMe = false;
+  int _xpEarned = 0;
+  bool _isBoostGame = false;
+  int _levelBefore = 1;
+  int _levelAfter = 1;
+  int _totalXpAfter = 0;
+
+  // XP helpers (exponential: 100 * level^1.5)
+  static int _xpNeededForLevel(int level) => (100 * pow(level, 1.5)).round();
+  static int _levelFromTotalXP(int totalXp) {
+    int level = 1;
+    int acc = 0;
+    while (true) {
+      final needed = _xpNeededForLevel(level);
+      if (acc + needed > totalXp) break;
+      acc += needed;
+      level++;
+    }
+    return level;
+  }
+  static int _xpInCurrentLevel(int totalXp, int level) {
+    int acc = 0;
+    for (int l = 1; l < level; l++) acc += _xpNeededForLevel(l);
+    return totalXp - acc;
+  }
 
   @override
   void initState() {
@@ -509,42 +533,74 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     } catch (_) {}
   }
 
-  Future<void> _awardWinner() async {
-    if (widget.sessionTicket.isEmpty) return;
-    try {
-      // Award coins (double the bet)
-      await http.post(
-        Uri.parse('https://1A15A2.playfabapi.com/Client/AddUserVirtualCurrency'),
-        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-        body: json.encode({"VirtualCurrency": "CO", "Amount": widget.betAmount * 2}),
-      );
-      // Award XP (+25 for win)
-      final xpRes = await http.post(
-        Uri.parse('https://1A15A2.playfabapi.com/Client/GetUserData'),
-        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-        body: json.encode({"Keys": ["XP"]}),
-      );
-      if (xpRes.statusCode == 200) {
-        final xpData = json.decode(xpRes.body)['data']?['Data'];
-        final currentXp = int.tryParse(xpData?['XP']?['Value'] ?? '0') ?? 0;
-        await http.post(
-          Uri.parse('https://1A15A2.playfabapi.com/Client/UpdateUserData'),
-          headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-          body: json.encode({"Data": {"XP": (currentXp + 25).toString()}}),
-        );
-      }
-    } catch (_) {}
-  }
-
   void _endGame({required String winnerName}) {
     _turnTimer?.cancel();
     final iWon = winnerName == widget.myName;
-    if (iWon) _awardWinner();
     setState(() {
       _gameState = "gameOver";
       _winnerIsMe = iWon;
-      _showWinScreen = true;
     });
+    _awardXPAndCoins(iWon: iWon);
+  }
+
+  Future<void> _awardXPAndCoins({required bool iWon}) async {
+    if (widget.sessionTicket.isEmpty) {
+      if (mounted) setState(() { _showWinScreen = true; });
+      return;
+    }
+    try {
+      final res = await http.post(
+        Uri.parse('https://1A15A2.playfabapi.com/Client/GetUserData'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({"Keys": ["TotalXP", "DailyGamesPlayed", "LastGameDate"]}),
+      );
+      int totalXp = 0;
+      int dailyGames = 0;
+      String lastGameDate = '';
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body)['data']?['Data'];
+        totalXp = int.tryParse(data?['TotalXP']?['Value'] ?? '0') ?? 0;
+        dailyGames = int.tryParse(data?['DailyGamesPlayed']?['Value'] ?? '0') ?? 0;
+        lastGameDate = data?['LastGameDate']?['Value'] ?? '';
+      }
+      final today = DateTime.now().toUtc().toIso8601String().substring(0, 10);
+      if (lastGameDate != today) dailyGames = 0;
+      final isBoost = dailyGames < 5;
+      final xpEarned = isBoost ? 50 : 25;
+      final newTotalXP = totalXp + xpEarned;
+      final newDailyGames = isBoost ? dailyGames + 1 : dailyGames;
+      final levelBefore = _levelFromTotalXP(totalXp);
+      final levelAfter = _levelFromTotalXP(newTotalXP);
+
+      await http.post(
+        Uri.parse('https://1A15A2.playfabapi.com/Client/UpdateUserData'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({"Data": {
+          "TotalXP": newTotalXP.toString(),
+          "DailyGamesPlayed": newDailyGames.toString(),
+          "LastGameDate": today,
+        }}),
+      );
+      if (iWon) {
+        await http.post(
+          Uri.parse('https://1A15A2.playfabapi.com/Client/AddUserVirtualCurrency'),
+          headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+          body: json.encode({"VirtualCurrency": "CO", "Amount": widget.betAmount * 2}),
+        );
+      }
+      if (mounted) {
+        setState(() {
+          _xpEarned = xpEarned;
+          _isBoostGame = isBoost;
+          _levelBefore = levelBefore;
+          _levelAfter = levelAfter;
+          _totalXpAfter = newTotalXP;
+          _showWinScreen = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _showWinScreen = true; });
+    }
   }
 
   void _confirmExitDialog() {
@@ -1011,100 +1067,146 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   Widget _buildWinScreen(double width, double height) {
     final coinsAwarded = _winnerIsMe ? widget.betAmount * 2 : 0;
     final winnerLabel = _winnerIsMe ? widget.myName : widget.opponentName;
+    final didLevelUp = _levelAfter > _levelBefore;
+    final xpNeeded = _xpNeededForLevel(_levelAfter);
+    final xpInLevel = _xpInCurrentLevel(_totalXpAfter, _levelAfter);
+    final progressFraction = xpNeeded > 0 ? (xpInLevel / xpNeeded).clamp(0.0, 1.0) : 0.0;
 
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withValues(alpha: 0.85),
+        color: Colors.black.withValues(alpha: 0.88),
         child: Center(
-          child: Container(
-            width: width * 0.65,
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0A192F), Color(0xFF1A3A5C)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          child: SingleChildScrollView(
+            child: Container(
+              width: width * 0.65,
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 30),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0A192F), Color(0xFF1A3A5C)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.amber, width: 2.5),
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, spreadRadius: 5)],
               ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.amber, width: 2.5),
-              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, spreadRadius: 5)],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _winnerIsMe ? Icons.emoji_events : Icons.sentiment_dissatisfied,
-                  color: _winnerIsMe ? Colors.amber : Colors.grey,
-                  size: 72,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _winnerIsMe ? "ניצחת!" : "הפסדת",
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: _winnerIsMe ? Colors.amber : Colors.white60,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _winnerIsMe ? Icons.emoji_events : Icons.sentiment_dissatisfied,
+                    color: _winnerIsMe ? Colors.amber : Colors.grey,
+                    size: 68,
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  winnerLabel,
-                  style: const TextStyle(fontSize: 20, color: Colors.white70),
-                ),
-                const SizedBox(height: 28),
-                if (_winnerIsMe) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _winnerIsMe ? "ניצחת!" : "הפסדת",
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.bold,
+                      color: _winnerIsMe ? Colors.amber : Colors.white60,
+                    ),
+                  ),
+                  Text(winnerLabel, style: const TextStyle(fontSize: 18, color: Colors.white70)),
+                  const SizedBox(height: 20),
+
+                  // Coins (winner only)
+                  if (_winnerIsMe)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.black38,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.monetization_on, color: Colors.amber, size: 24),
+                          const SizedBox(width: 8),
+                          Text("+$coinsAwarded מטבעות", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
+                        ],
+                      ),
+                    ),
+
+                  // XP earned (always shown)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.black38,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.5)),
                     ),
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.monetization_on, color: Colors.amber, size: 26),
+                            const Icon(Icons.star, color: Colors.lightBlueAccent, size: 22),
                             const SizedBox(width: 8),
-                            Text(
-                              "+$coinsAwarded מטבעות",
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.amber),
-                            ),
+                            Text("+$_xpEarned XP", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.lightBlueAccent)),
+                            if (_isBoostGame) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(8)),
+                                child: const Text("x2 בונוס!", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                              ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.star, color: Colors.lightBlueAccent, size: 22),
-                            SizedBox(width: 8),
-                            Text("+25 XP", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.lightBlueAccent)),
-                          ],
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progressFraction,
+                            backgroundColor: Colors.grey[700],
+                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.lightBlueAccent),
+                            minHeight: 6,
+                          ),
                         ),
+                        const SizedBox(height: 4),
+                        Text("רמה $_levelAfter  •  $xpInLevel / $xpNeeded XP", style: const TextStyle(fontSize: 11, color: Colors.white54)),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 28),
-                ] else
-                  const SizedBox(height: 28),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _winnerIsMe ? Colors.amber : Colors.blueGrey,
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-                  child: Text(
-                    "חזור למסך הבית",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: _winnerIsMe ? Colors.black : Colors.white,
+
+                  // Level-up banner
+                  if (didLevelUp) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFFFFB300), Color(0xFFFF6F00)]),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+                          const SizedBox(width: 6),
+                          Text("עלית לרמה $_levelAfter!", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _winnerIsMe ? Colors.amber : Colors.blueGrey,
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    ),
+                    onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                    child: Text(
+                      "חזור למסך הבית",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _winnerIsMe ? Colors.black : Colors.white),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

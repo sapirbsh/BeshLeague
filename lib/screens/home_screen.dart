@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter_markdown/flutter_markdown.dart'; 
 import 'package:besh_league/screens/auth_screen.dart';
 import 'package:besh_league/screens/about_screen.dart'; 
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int coins = 0;
   int trophies = 0;
   int xp = 0;
+  int dailyGamesPlayed = 0;
   int streakDays = 0;
   String lastLogin = "טוען...";
   int leaguesPlayed = 0; 
@@ -182,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final userDataRes = await http.post(
         Uri.parse('https://$titleId.playfabapi.com/Client/GetUserData'), 
         headers: headers, 
-        body: json.encode({"Keys": ["FriendRequests", "DuelRequests", "DuelStatus", "CurrentLogin", "PreviousLogin", "XP", "StreakDays"]})
+        body: json.encode({"Keys": ["FriendRequests", "DuelRequests", "DuelStatus", "CurrentLogin", "PreviousLogin", "TotalXP", "DailyGamesPlayed", "StreakDays"]})
       );
       
       List<dynamic> fetchedRequests = [];
@@ -202,8 +204,14 @@ class _HomeScreenState extends State<HomeScreen> {
           
           if (userData['CurrentLogin'] != null) savedCurrentLogin = userData['CurrentLogin']['Value'];
           if (userData['PreviousLogin'] != null) savedPreviousLogin = userData['PreviousLogin']['Value'];
-          fetchedXp = int.tryParse(userData['XP']?['Value'] ?? '0') ?? 0;
+          fetchedXp = int.tryParse(userData['TotalXP']?['Value'] ?? '0') ?? 0;
           fetchedStreakDays = int.tryParse(userData['StreakDays']?['Value'] ?? '0') ?? 0;
+          final fetchedDailyGames = int.tryParse(userData['DailyGamesPlayed']?['Value'] ?? '0') ?? 0;
+          final lastGameDateStr = userData['LastGameDate']?['Value'] ?? '';
+          final today = DateTime.now().toUtc().toIso8601String().substring(0, 10);
+          if (mounted) {
+            setState(() { dailyGamesPlayed = lastGameDateStr == today ? fetchedDailyGames : 0; });
+          }
         }
       }
 
@@ -1095,13 +1103,24 @@ Widget _buildLeftMenu(double width, double height) {
   }
 
   Widget _buildXpBar() {
-    const xpPerLevel = 100;
-    final level = xp ~/ xpPerLevel + 1;
-    final relXp = xp % xpPerLevel;
-    final progress = relXp / xpPerLevel;
+    // Exponential formula: xpNeeded = 100 * level^1.5
+    int level = 1;
+    int acc = 0;
+    while (true) {
+      final needed = (100 * pow(level, 1.5)).round();
+      if (acc + needed > xp) break;
+      acc += needed;
+      level++;
+      if (level > 200) break;
+    }
+    final xpNeededThisLevel = (100 * pow(level, 1.5)).round();
+    final xpInLevel = xp - acc;
+    final progress = xpNeededThisLevel > 0 ? (xpInLevel / xpNeededThisLevel).clamp(0.0, 1.0) : 0.0;
+    final boostRemaining = (5 - dailyGamesPlayed).clamp(0, 5);
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(12),
@@ -1118,7 +1137,7 @@ Widget _buildLeftMenu(double width, double height) {
                 const SizedBox(width: 4),
                 Text("רמה $level", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
               ]),
-              Text("$relXp / $xpPerLevel XP", style: const TextStyle(fontSize: 10, color: Colors.white70)),
+              Text("$xpInLevel / $xpNeededThisLevel XP", style: const TextStyle(fontSize: 10, color: Colors.white70)),
             ],
           ),
           const SizedBox(height: 4),
@@ -1130,6 +1149,24 @@ Widget _buildLeftMenu(double width, double height) {
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
               minHeight: 9,
             ),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.bolt, color: Colors.amber, size: 12),
+              const SizedBox(width: 3),
+              Text(
+                boostRemaining > 0 ? "בונוס XP x2: נותרו $boostRemaining משחקים היום" : "בונוס יומי נוצל",
+                style: TextStyle(fontSize: 9, color: boostRemaining > 0 ? Colors.amber : Colors.white38),
+              ),
+              const SizedBox(width: 6),
+              ...List.generate(5, (i) => Icon(
+                i < dailyGamesPlayed.clamp(0, 5) ? Icons.star : Icons.star_border,
+                color: i < dailyGamesPlayed.clamp(0, 5) ? Colors.orange : Colors.white30,
+                size: 11,
+              )),
+            ],
           ),
         ],
       ),
