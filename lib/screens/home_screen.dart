@@ -6,6 +6,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:besh_league/screens/auth_screen.dart';
 import 'package:besh_league/screens/about_screen.dart'; 
 import 'package:besh_league/screens/pre_game_screen.dart';
+import 'package:besh_league/screens/daily_streak_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 
@@ -25,7 +26,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isFriendsPanelOpen = false;
   bool _isNavigatingToGame = false;
   int coins = 0;
-  int trophies = 0; 
+  int trophies = 0;
+  int xp = 0;
+  int streakDays = 0;
   String lastLogin = "טוען...";
   int leaguesPlayed = 0; 
   int totalWins = 0;
@@ -180,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final userDataRes = await http.post(
         Uri.parse('https://$titleId.playfabapi.com/Client/GetUserData'), 
         headers: headers, 
-        body: json.encode({"Keys": ["FriendRequests", "DuelRequests", "DuelStatus", "CurrentLogin", "PreviousLogin"]})
+        body: json.encode({"Keys": ["FriendRequests", "DuelRequests", "DuelStatus", "CurrentLogin", "PreviousLogin", "XP", "StreakDays"]})
       );
       
       List<dynamic> fetchedRequests = [];
@@ -188,6 +191,8 @@ class _HomeScreenState extends State<HomeScreen> {
       Map<String, dynamic>? duelStatus;
       String savedCurrentLogin = "";
       String savedPreviousLogin = "";
+      int fetchedXp = 0;
+      int fetchedStreakDays = 0;
 
       if (userDataRes.statusCode == 200) {
         final userData = json.decode(userDataRes.body)['data']?['Data'];
@@ -198,6 +203,8 @@ class _HomeScreenState extends State<HomeScreen> {
           
           if (userData['CurrentLogin'] != null) savedCurrentLogin = userData['CurrentLogin']['Value'];
           if (userData['PreviousLogin'] != null) savedPreviousLogin = userData['PreviousLogin']['Value'];
+          fetchedXp = int.tryParse(userData['XP']?['Value'] ?? '0') ?? 0;
+          fetchedStreakDays = int.tryParse(userData['StreakDays']?['Value'] ?? '0') ?? 0;
         }
       }
 
@@ -274,13 +281,15 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           setState(() {
-            playfabUsername = userInfo['Username'] ?? "שחקן"; 
-            userEmail = privateInfo?['Email'] ?? ""; 
+            playfabUsername = userInfo['Username'] ?? "שחקן";
+            userEmail = privateInfo?['Email'] ?? "";
             coins = fetchedCoins;
-            lastLogin = displayLoginStr; 
-            friendsList = fetchedFriends; 
-            friendRequests = fetchedRequests; 
-            onlineFriendIds = fetchedOnlineIds; 
+            xp = fetchedXp;
+            streakDays = fetchedStreakDays;
+            lastLogin = displayLoginStr;
+            friendsList = fetchedFriends;
+            friendRequests = fetchedRequests;
+            onlineFriendIds = fetchedOnlineIds;
             isLoadingData = false;
           });
         }
@@ -977,6 +986,10 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$coins מטבעות", style: const TextStyle(color: Colors.white, fontSize: 16))]),
           Row(children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$trophies גביעים", style: const TextStyle(color: Colors.white, fontSize: 16))]),
           IconButton(icon: const Icon(Icons.settings, color: Colors.white, size: 28), onPressed: _showSettingsMenu),
+          IconButton(
+            icon: const Icon(Icons.calendar_today, color: Colors.white, size: 28),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => DailyStreakScreen(sessionTicket: widget.sessionTicket))),
+          ),
           Image.asset('assets/logo.png', height: height * 0.08),
         ],
       ),
@@ -994,7 +1007,10 @@ Widget _buildLeftMenu(double width, double height) {
             SizedBox(height: height * 0.02),
             _buildSquareMenuButton(Icons.emoji_events, const Color(0xFFFFB74D), buttonSize),
             SizedBox(height: height * 0.02),
-            _buildSquareMenuButton(Icons.calendar_month, const Color(0xFFFFB74D), buttonSize),
+            GestureDetector(
+              onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("מלאי - בקרוב!", textAlign: TextAlign.right))),
+              child: _buildSquareMenuButton(Icons.inventory_2, const Color(0xFF64B5F6), buttonSize),
+            ),
           ],
         ),
         Container(
@@ -1091,6 +1107,8 @@ Widget _buildLeftMenu(double width, double height) {
               Container(width: width * 0.25, color: Colors.white, child: Table(border: TableBorder.all(color: Colors.black, width: 2), children: [TableRow(children: [_buildTableCell("נצחונות", true), _buildTableCell("הפסדים", true)]), TableRow(children: [_buildTableCell("$totalWins", false), _buildTableCell("$totalLosses", false)])])),
               const Spacer(),
               Directionality(textDirection: TextDirection.ltr, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 35), const SizedBox(width: 10), Text("X  $trophies", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black))])),
+              const SizedBox(height: 6),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.star, color: Colors.orange, size: 22), const SizedBox(width: 6), Text("$xp XP", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54))]),
             ],
           ),
         ),
