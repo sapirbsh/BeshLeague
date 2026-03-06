@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Besh League – ליגת השש-בש התחרותית הראשונה בישראל</title>
+  <meta name="description" content="הצטרף ל-Besh League, ליגת השש-בש התחרותית הראשונה בישראל. שחק, שרוד, נצח." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ── RESET & BASE ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:       #0a0e1a;
+      --navy-mid:   #111827;
+      --navy-light: #1e2d4a;
+      --gold:       #f5c842;
+      --gold-dark:  #c99c1a;
+      --green:      #39ff14;
+      --green-dark: #22cc00;
+      --white:      #f0f4ff;
+      --grey:       #8892a4;
+      --red:        #ff4444;
+      --yellow:     #ffcc00;
+      --radius:     14px;
+      --shadow:     0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Heebo', sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; right: 0; left: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 40px;
+      background: rgba(10,14,26,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(245,200,66,0.15);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo img {
+      height: 38px;
+      width: auto;
+    }
+
+    .nav-logo-text {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: var(--gold);
+      letter-spacing: 1px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--white);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--gold); }
+
+    .nav-cta {
+      background: var(--green);
+      color: #000 !important;
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-weight: 800 !important;
+    }
+
+    .nav-cta:hover { background: var(--green-dark) !important; }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 20px 80px;
+      background:
+        radial-gradient(ellipse at 60% 30%, rgba(245,200,66,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 20% 80%, rgba(57,255,20,0.07) 0%, transparent 50%),
+        linear-gradient(180deg, #0a0e1a 0%, #0d1526 60%, #0a0e1a 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: 15%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245,200,66,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-content { position: relative; z-index: 1; max-width: 820px; }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(245,200,66,0.15);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      padding: 6px 18px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 24px;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 5.5vw, 3.8rem);
+      font-weight: 900;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      color: #fff;
+    }
+
+    .hero-title .highlight {
+      background: linear-gradient(90deg, var(--gold), #ffea80);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2.2vw, 1.25rem);
+      color: var(--grey);
+      max-width: 620px;
+      margin: 0 auto 40px;
+      font-weight: 400;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 60px;
+    }
+
+    .btn-store {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 28px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 2px solid transparent;
+    }
+
+    .btn-store:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0,0,0,0.4); }
+
+    .btn-appstore {
+      background: #fff;
+      color: #000;
+    }
+
+    .btn-google {
+      background: var(--navy-light);
+      color: var(--white);
+      border-color: rgba(255,255,255,0.15);
+    }
+
+    .btn-store .store-icon { font-size: 1.6rem; }
+
+    .btn-store .store-text { text-align: right; }
+    .btn-store .store-text small { display: block; font-size: 0.7rem; font-weight: 400; opacity: 0.7; }
+    .btn-store .store-text strong { font-size: 1rem; }
+
+    .hero-trophies {
+      font-size: 4rem;
+      letter-spacing: 10px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 0 20px rgba(245,200,66,0.5));
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--gold);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--grey);
+      font-weight: 500;
+    }
+
+    /* ── SECTIONS ── */
+    section {
+      padding: 90px 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      font-size: clamp(1.6rem, 3.5vw, 2.5rem);
+      font-weight: 900;
+      text-align: center;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .section-sub {
+      text-align: center;
+      color: var(--grey);
+      font-size: 1rem;
+      margin-bottom: 56px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .gold-line {
+      width: 60px;
+      height: 4px;
+      background: linear-gradient(90deg, var(--gold), transparent);
+      margin: 16px auto 40px;
+      border-radius: 2px;
+    }
+
+    /* ── HOW IT WORKS ── */
+    #how {
+      background: var(--navy-mid);
+    }
+
+    .weeks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .week-card {
+      background: var(--navy);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      border: 1px solid rgba(255,255,255,0.07);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .week-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+
+    .week-card::before {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; left: 0;
+      height: 4px;
+    }
+
+    .week-card.green::before { background: var(--green); }
+    .week-card.yellow::before { background: var(--yellow); }
+    .week-card.red::before { background: var(--red); }
+
+    .week-num {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    .week-card.green .week-num { background: rgba(57,255,20,0.15); color: var(--green); }
+    .week-card.yellow .week-num { background: rgba(255,204,0,0.15); color: var(--yellow); }
+    .week-card.red .week-num { background: rgba(255,68,68,0.15); color: var(--red); }
+
+    .week-emoji { font-size: 2.5rem; margin-bottom: 16px; }
+
+    .week-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .week-desc {
+      color: var(--grey);
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* ── PRIZES ── */
+    #prizes {
+      background: linear-gradient(180deg, var(--navy) 0%, #0b1220 100%);
+    }
+
+    .prizes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+
+    .prize-card {
+      border-radius: var(--radius);
+      padding: 36px 28px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .prize-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+
+    .prize-card.gold-card {
+      background: linear-gradient(145deg, #1a1300, #2a1f00);
+      border-color: var(--gold);
+      box-shadow: 0 0 30px rgba(245,200,66,0.2);
+    }
+
+    .prize-card.silver-card {
+      background: linear-gradient(145deg, #101418, #1a1e24);
+      border-color: #b0b8c8;
+    }
+
+    .prize-card.bronze-card {
+      background: linear-gradient(145deg, #110d00, #1e1500);
+      border-color: #cd7f32;
+    }
+
+    .prize-card.finalists-card {
+      background: var(--navy-mid);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .prize-medal {
+      font-size: 3.5rem;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 0 10px rgba(245,200,66,0.4));
+    }
+
+    .prize-place {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .gold-card .prize-place { color: var(--gold); }
+    .silver-card .prize-place { color: #b0b8c8; }
+    .bronze-card .prize-place { color: #cd7f32; }
+    .finalists-card .prize-place { color: var(--grey); }
+
+    .prize-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+
+    .prize-items {
+      list-style: none;
+      text-align: right;
+    }
+
+    .prize-items li {
+      color: var(--grey);
+      font-size: 0.9rem;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .prize-items li:last-child { border-bottom: none; }
+
+    .prize-items li .pi-icon { flex-shrink: 0; }
+
+    /* ── FEATURES ── */
+    #features {
+      background: var(--navy-mid);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--navy);
+      border-radius: var(--radius);
+      padding: 36px 28px;
+      border: 1px solid rgba(255,255,255,0.07);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(245,200,66,0.3);
+    }
+
+    .feature-icon {
+      font-size: 2.8rem;
+      margin-bottom: 20px;
+    }
+
+    .feature-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: var(--gold);
+    }
+
+    .feature-desc {
+      color: var(--grey);
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* ── ABOUT ── */
+    #about {
+      background: var(--navy);
+    }
+
+    .about-inner {
+      max-width: 780px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .about-quote {
+      background: var(--navy-light);
+      border-radius: var(--radius);
+      padding: 44px 40px;
+      border-right: 4px solid var(--gold);
+      text-align: right;
+    }
+
+    .about-quote p {
+      font-size: 1.1rem;
+      line-height: 1.9;
+      color: var(--white);
+      font-weight: 400;
+    }
+
+    .about-quote p strong {
+      color: var(--gold);
+    }
+
+    /* ── BOTTOM CTA ── */
+    #download {
+      background: linear-gradient(135deg, #0b1826 0%, #0e1c10 50%, #0b1826 100%);
+      text-align: center;
+      padding: 100px 20px;
+    }
+
+    .download-title {
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      font-weight: 900;
+      margin-bottom: 16px;
+    }
+
+    .download-sub {
+      color: var(--grey);
+      font-size: 1.1rem;
+      margin-bottom: 48px;
+    }
+
+    .download-limited {
+      display: inline-block;
+      background: rgba(255,68,68,0.15);
+      border: 1px solid var(--red);
+      color: var(--red);
+      padding: 6px 18px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 32px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #06080f;
+      padding: 60px 20px 30px;
+      border-top: 1px solid rgba(245,200,66,0.15);
+    }
+
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .footer-top {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 40px;
+      margin-bottom: 48px;
+    }
+
+    .footer-brand .nav-logo-text { font-size: 1.5rem; }
+
+    .footer-brand p {
+      color: var(--grey);
+      font-size: 0.9rem;
+      margin-top: 12px;
+      line-height: 1.7;
+    }
+
+    .footer-col h4 {
+      color: var(--gold);
+      font-weight: 800;
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .footer-col ul { list-style: none; }
+
+    .footer-col ul li { margin-bottom: 10px; }
+
+    .footer-col ul a {
+      color: var(--grey);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .footer-col ul a:hover { color: var(--white); }
+
+    /* Terms accordion */
+    .terms-section {
+      background: var(--navy-mid);
+      border-radius: var(--radius);
+      margin-bottom: 48px;
+      border: 1px solid rgba(255,255,255,0.07);
+      overflow: hidden;
+    }
+
+    .terms-toggle {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--white);
+      font-family: 'Heebo', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .terms-toggle:hover { background: rgba(255,255,255,0.03); }
+
+    .terms-arrow {
+      transition: transform 0.3s;
+      color: var(--gold);
+      font-size: 1.2rem;
+    }
+
+    .terms-toggle.open .terms-arrow { transform: rotate(180deg); }
+
+    .terms-body {
+      display: none;
+      padding: 0 28px 28px;
+    }
+
+    .terms-body.open { display: block; }
+
+    .terms-body ol {
+      padding-right: 20px;
+      color: var(--grey);
+      font-size: 0.9rem;
+      line-height: 1.8;
+    }
+
+    .terms-body ol li { margin-bottom: 12px; }
+
+    .terms-body ol li strong { color: var(--white); }
+
+    .footer-bottom {
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding-top: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-bottom p {
+      color: var(--grey);
+      font-size: 0.82rem;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 20px;
+    }
+
+    .footer-links a {
+      color: var(--grey);
+      text-decoration: none;
+      font-size: 0.82rem;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: var(--white); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      nav { padding: 12px 20px; }
+      .nav-links { display: none; }
+
+      .hero-stats { gap: 24px; }
+
+      .about-quote { padding: 28px 24px; }
+
+      .footer-bottom { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ── SCROLL REVEAL (simple fade) ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════ NAV ════ -->
+  <nav>
+    <a class="nav-logo" href="#hero">
+      <img src="assets/logo.png" alt="Besh League Logo" onerror="this.style.display='none'" />
+      <span class="nav-logo-text">Besh League</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#how">איך זה עובד</a></li>
+      <li><a href="#prizes">פרסים</a></li>
+      <li><a href="#features">פיצ'רים</a></li>
+      <li><a href="#about">אודות</a></li>
+      <li><a href="#download" class="nav-cta">הורד עכשיו</a></li>
+    </ul>
+  </nav>
+
+  <!-- ════ HERO ════ -->
+  <section id="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+      <div class="hero-badge">🇮🇱 הליגה התחרותית הראשונה בישראל</div>
+
+      <h1 class="hero-title">
+        שש-בש זה לא רק מזל.<br />
+        <span class="highlight">הגיע הזמן להרוויח מהכישרון שלך.</span>
+      </h1>
+
+      <p class="hero-sub">
+        הצטרף ל-Besh League, ליגת השש-בש התחרותית הראשונה בישראל!
+        שחק נגד שחקנים אמיתיים, שרוד את שלבי ההדחה, וזכה בגיפט-קארדים, מטבעות וגביעים יוקרתיים.
+      </p>
+
+      <div class="hero-cta">
+        <a href="#" class="btn-store btn-appstore">
+          <span class="store-icon">🍎</span>
+          <span class="store-text">
+            <small>Download on the</small>
+            <strong>App Store</strong>
+          </span>
+        </a>
+        <a href="#" class="btn-store btn-google">
+          <span class="store-icon">▶</span>
+          <span class="store-text">
+            <small>Get it on</small>
+            <strong>Google Play</strong>
+          </span>
+        </a>
+      </div>
+
+      <div class="hero-trophies">🏆🎲🏆</div>
+
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-num">3</div>
+          <div class="stat-label">שבועות של תחרות</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">100₪</div>
+          <div class="stat-label">פרס ראשון</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">24/7</div>
+          <div class="stat-label">משחקים זמינים</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ HOW IT WORKS ════ -->
+  <section id="how">
+    <div class="container">
+      <h2 class="section-title reveal">3 שבועות של אדרנלין. האם תשרוד עד לגמר?</h2>
+      <div class="gold-line"></div>
+
+      <div class="weeks">
+        <div class="week-card green reveal">
+          <span class="week-num">שבוע 1</span>
+          <div class="week-emoji">🟢</div>
+          <h3 class="week-title">המוקדמות</h3>
+          <p class="week-desc">
+            הליגה נפתחת! שחק כמה שיותר, צבור ניצחונות ורצפים.
+            במוצאי שבת – ה-50% בתחתית הטבלה מודחים.
+            <strong>האם תישאר מעל הקו האדום?</strong>
+          </p>
+        </div>
+
+        <div class="week-card yellow reveal">
+          <span class="week-num">שבוע 2</span>
+          <div class="week-emoji">🟡</div>
+          <h3 class="week-title">סיר הלחץ</h3>
+          <p class="week-desc">
+            הניקוד מתאפס והמתח עולה. רק השחקנים החזקים ביותר נשארו.
+            הילחם על מקומך ב-Top 10 כדי לקבל את <strong>הכרטיס היוקרתי לגמר הגדול</strong>.
+          </p>
+        </div>
+
+        <div class="week-card red reveal">
+          <span class="week-num">שבוע 3</span>
+          <div class="week-emoji">🔴</div>
+          <h3 class="week-title">הגמר הגדול ו"חוק העלטה"</h3>
+          <p class="week-desc">
+            עשרת הפיינליסטים בקרב ראש בראש. ב-24 השעות האחרונות
+            <strong>הניקוד בטבלה מוסתר!</strong>
+            שחק על עיוור, תן את כל מה שיש לך, ותגלה ביום ראשון בבוקר אם אתה האלוף.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ PRIZES ════ -->
+  <section id="prizes">
+    <div class="container">
+      <h2 class="section-title reveal">התהילה, הגביעים, והפרסים.</h2>
+      <div class="gold-line"></div>
+
+      <div class="prizes-grid">
+        <div class="prize-card gold-card reveal">
+          <div class="prize-medal">🥇</div>
+          <div class="prize-place">קלף זהב · מקום 1</div>
+          <h3 class="prize-title">אלוף העונה</h3>
+          <ul class="prize-items">
+            <li><span class="pi-icon">🎁</span> גיפט קארד 100 ש"ח לקניות</li>
+            <li><span class="pi-icon">🏆</span> 10 גביעי זהב לפרופיל</li>
+            <li><span class="pi-icon">👑</span> תואר "אלוף העונה"</li>
+          </ul>
+        </div>
+
+        <div class="prize-card silver-card reveal">
+          <div class="prize-medal">🥈</div>
+          <div class="prize-place">קלף כסף · מקום 2</div>
+          <h3 class="prize-title">סגן האלוף</h3>
+          <ul class="prize-items">
+            <li><span class="pi-icon">🎟️</span> כניסה חינם לליגה הבאה</li>
+            <li><span class="pi-icon">🪙</span> 500 מטבעות</li>
+            <li><span class="pi-icon">🥈</span> 5 גביעי כסף</li>
+          </ul>
+        </div>
+
+        <div class="prize-card bronze-card reveal">
+          <div class="prize-medal">🥉</div>
+          <div class="prize-place">קלף ארד · מקום 3</div>
+          <h3 class="prize-title">מקום שלישי</h3>
+          <ul class="prize-items">
+            <li><span class="pi-icon">🪙</span> 500 מטבעות</li>
+            <li><span class="pi-icon">🥉</span> 3 גביעי ארד</li>
+          </ul>
+        </div>
+
+        <div class="prize-card finalists-card reveal">
+          <div class="prize-medal">🏅</div>
+          <div class="prize-place">מקומות 4–10</div>
+          <h3 class="prize-title">פיינליסטים</h3>
+          <ul class="prize-items">
+            <li><span class="pi-icon">🪙</span> 500 מטבעות</li>
+            <li><span class="pi-icon">🏅</span> גביע "משתתף הגמר"</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ FEATURES ════ -->
+  <section id="features">
+    <div class="container">
+      <h2 class="section-title reveal">למה דווקא Besh League?</h2>
+      <p class="section-sub reveal">מה שמבדיל אותנו מכל משחק שש-בש אחר</p>
+
+      <div class="features-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon">🔥</div>
+          <h3 class="feature-title">בונוס על רצף ניצחונות</h3>
+          <p class="feature-desc">
+            מנצח ברצף? הניקוד שלך קופץ משמעותית עם מנגנון ה-Win Streak שלנו!
+            ניצחון ברצף שני ואילך = 35 נקודות במקום 25.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">🛡️</div>
+          <h3 class="feature-title">מערכת שובר-שוויון חכמה</h3>
+          <p class="feature-desc">
+            הגעתם לאותו ניקוד? המערכת בודקת מי "אכל" יותר כלים ליריבים שלו
+            במהלך העונה. כאן כל דאם קובע.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">📱</div>
+          <h3 class="feature-title">משחקים אקראיים תמיד זמינים</h3>
+          <p class="feature-desc">
+            לא רוצה לחכות לליגה? היכנס למשחק מהיר של 50 מטבעות
+            נגד יריב אקראי – 24/7, בכל מקום.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ ABOUT ════ -->
+  <section id="about">
+    <div class="container">
+      <div class="about-inner">
+        <h2 class="section-title reveal">מי אנחנו?</h2>
+        <p class="section-sub reveal">הסיפור שמאחורי הקוביות</p>
+
+        <div class="about-quote reveal">
+          <p>
+            Besh League נולדה מתוך <strong>אהבה אמיתית למשחק השש-בש הישראלי</strong>,
+            ומתוך תסכול אחד גדול: למה משחקי שש-בש במובייל מרגישים כל כך חסרי מטרה?
+          </p>
+          <br />
+          <p>
+            החלטנו לקחת את המשחק הקלאסי שכולנו גדלנו עליו, ולהזריק לו
+            <strong>אדרנלין של eSports</strong>.
+            יצרנו פלטפורמה שבה שחקנים טובים באמת יכולים למדוד את עצמם מול אחרים,
+            לטפס בדירוג, להרגיש את הלחץ של סכנת הדחה, ולזכות בפרסים שווים.
+          </p>
+          <br />
+          <p>
+            <strong>בלי בוטים בליגה. בלי משחקים חסרי משמעות.</strong><br />
+            כאן – כל זריקת קובייה קובעת.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ BOTTOM CTA ════ -->
+  <section id="download">
+    <div class="container">
+      <div class="download-limited">⏰ כרטיסי הכניסה מוגבלים</div>
+      <h2 class="download-title reveal">העונה הקרובה עומדת להתחיל.</h2>
+      <p class="download-sub reveal">אל תחמיץ את ההזדמנות שלך להיות האלוף הבא.</p>
+      <div class="hero-cta">
+        <a href="#" class="btn-store btn-appstore">
+          <span class="store-icon">🍎</span>
+          <span class="store-text">
+            <small>Download on the</small>
+            <strong>App Store</strong>
+          </span>
+        </a>
+        <a href="#" class="btn-store btn-google">
+          <span class="store-icon">▶</span>
+          <span class="store-text">
+            <small>Get it on</small>
+            <strong>Google Play</strong>
+          </span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ FOOTER ════ -->
+  <footer>
+    <div class="footer-inner">
+
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="nav-logo-text">🎲 Besh League</div>
+          <p>ליגת השש-בש התחרותית הראשונה בישראל.<br />שחק חכם. שרוד. נצח.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>ניווט</h4>
+          <ul>
+            <li><a href="#how">איך זה עובד</a></li>
+            <li><a href="#prizes">פרסים</a></li>
+            <li><a href="#features">פיצ'רים</a></li>
+            <li><a href="#about">אודות</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>צור קשר</h4>
+          <ul>
+            <li><a href="mailto:support@beshleague.com">📧 support@beshleague.com</a></li>
+          </ul>
+          <br />
+          <h4>משפטי</h4>
+          <ul>
+            <li><a href="#terms" id="open-terms">📋 תקנון הליגה</a></li>
+            <li><a href="#">🔒 מדיניות פרטיות</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Terms & Rules -->
+      <div class="terms-section" id="terms">
+        <button class="terms-toggle" id="terms-btn" onclick="toggleTerms()">
+          <span>📋 תקנון Besh League – חוקי המשחק והתחרות</span>
+          <span class="terms-arrow">▼</span>
+        </button>
+        <div class="terms-body" id="terms-body">
+          <ol>
+            <li>
+              <strong>השתתפות:</strong>
+              ההשתתפות בליגה פתוחה לכל משתמש שרכש כרטיס כניסה העולה 1,500 מטבעות משחק וירטואליים.
+            </li>
+            <li>
+              <strong>ניקוד:</strong>
+              ניצחון = 25 נקודות. ניצחון ברצף (שני ואילך) = 35 נקודות. הפסד לא מוריד נקודות אך מאפס את הרצף.
+            </li>
+            <li>
+              <strong>מבנה ההדחות:</strong>
+              3 שבועות עם הדחות שבועיות במוצאי שבת.
+            </li>
+            <li>
+              <strong>חוק ה-24 שעות (העלטה):</strong>
+              ביממה האחרונה הניקוד של כלל המשתתפים יוסתר.
+            </li>
+            <li>
+              <strong>הוגנות (Fair Play):</strong>
+              שחקן שייתפס מרמה, מנצל באגים, או משחק מול עצמו מחשבונות כפולים – יודח לאלתר וחשבונו ייחסם ללא החזר.
+            </li>
+            <li>
+              <strong>פרסים:</strong>
+              קבלת גיפט-קארד כפופה ליצירת קשר עם הזוכה תוך 7 ימי עסקים מסיום העונה.
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>© 2025 Besh League. כל הזכויות שמורות.</p>
+        <div class="footer-links">
+          <a href="#">מדיניות פרטיות</a>
+          <a href="#terms" onclick="toggleTerms()">תקנון</a>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <script>
+    // Toggle terms
+    function toggleTerms() {
+      const btn = document.getElementById('terms-btn');
+      const body = document.getElementById('terms-body');
+      btn.classList.toggle('open');
+      body.classList.toggle('open');
+    }
+
+    // Open terms from link
+    document.getElementById('open-terms')?.addEventListener('click', function(e) {
+      e.preventDefault();
+      const body = document.getElementById('terms-body');
+      if (!body.classList.contains('open')) toggleTerms();
+      setTimeout(() => document.getElementById('terms').scrollIntoView({ behavior: 'smooth' }), 100);
+    });
+
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>
