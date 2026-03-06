@@ -70,7 +70,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   
   int? _selectedPoint;
   Set<int> _validDestinations = {};
-  final List<Map<String, dynamic>> _moveHistory = []; 
+  final List<Map<String, dynamic>> _moveHistory = [];
+
+  // Win screen
+  bool _showWinScreen = false;
+  bool _winnerIsMe = false;
 
   @override
   void initState() {
@@ -312,6 +316,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         if (!_hasAnyValidMove()) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אין מהלכים אפשריים!", textAlign: TextAlign.center)));
           _endTurn();
+        } else {
+          _checkAndAutoMove();
         }
       }
     });
@@ -357,6 +363,46 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       if (_board[i] > 0 && _getValidDestinations(i).isNotEmpty) return true;
     }
     return false;
+  }
+
+  List<MapEntry<int, int>> _getAllValidMoves() {
+    List<MapEntry<int, int>> all = [];
+    if (_myBar > 0) {
+      for (int dest in _getValidDestinations(24)) {
+        all.add(MapEntry(24, dest));
+      }
+    } else {
+      for (int i = 0; i < 24; i++) {
+        if (_board[i] > 0) {
+          for (int dest in _getValidDestinations(i)) {
+            all.add(MapEntry(i, dest));
+          }
+        }
+      }
+    }
+    return all;
+  }
+
+  void _checkAndAutoMove() {
+    if (!mounted || _currentTurnId != widget.myPlayFabId || _availableMoves.isEmpty || _gameState != "playing") return;
+    final moves = _getAllValidMoves();
+    if (moves.isEmpty) return;
+    final unique = moves.map((e) => '${e.key}:${e.value}').toSet();
+    if (unique.length == 1) {
+      final move = moves.first;
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (!mounted || _currentTurnId != widget.myPlayFabId || _availableMoves.isEmpty || _gameState != "playing") return;
+        setState(() {
+          _selectedPoint = move.key;
+          _validDestinations = {move.value};
+        });
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!mounted || _currentTurnId != widget.myPlayFabId || _availableMoves.isEmpty || _gameState != "playing") return;
+          _executeMove(move.value);
+          Future.delayed(const Duration(milliseconds: 400), _checkAndAutoMove);
+        });
+      });
+    }
   }
 
   void _undoLastMove() {
@@ -466,36 +512,39 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   Future<void> _awardWinner() async {
     if (widget.sessionTicket.isEmpty) return;
     try {
+      // Award coins (double the bet)
       await http.post(
         Uri.parse('https://1A15A2.playfabapi.com/Client/AddUserVirtualCurrency'),
         headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-        body: json.encode({"VirtualCurrency": "CO", "Amount": 100}),
+        body: json.encode({"VirtualCurrency": "CO", "Amount": widget.betAmount * 2}),
       );
+      // Award XP (+25 for win)
+      final xpRes = await http.post(
+        Uri.parse('https://1A15A2.playfabapi.com/Client/GetUserData'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({"Keys": ["XP"]}),
+      );
+      if (xpRes.statusCode == 200) {
+        final xpData = json.decode(xpRes.body)['data']?['Data'];
+        final currentXp = int.tryParse(xpData?['XP']?['Value'] ?? '0') ?? 0;
+        await http.post(
+          Uri.parse('https://1A15A2.playfabapi.com/Client/UpdateUserData'),
+          headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+          body: json.encode({"Data": {"XP": (currentXp + 25).toString()}}),
+        );
+      }
     } catch (_) {}
   }
 
   void _endGame({required String winnerName}) {
-    setState(() { _gameState = "gameOver"; });
     _turnTimer?.cancel();
-    if (winnerName == widget.myName) _awardWinner();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2328),
-        title: const Text("המשחק נגמר!", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
-        content: Text("המנצח הוא: $winnerName 🏆", textAlign: TextAlign.center, style: const TextStyle(color: Colors.amber, fontSize: 22)),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent),
-              onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-              child: const Text("חזור למסך הבית", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-            ),
-          )
-        ],
-      ),
-    );
+    final iWon = winnerName == widget.myName;
+    if (iWon) _awardWinner();
+    setState(() {
+      _gameState = "gameOver";
+      _winnerIsMe = iWon;
+      _showWinScreen = true;
+    });
   }
 
   void _confirmExitDialog() {
@@ -563,6 +612,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                     SizedBox(width: width * 0.18, child: _buildOpponentPanel()),
                   ],
                 ),
+
+                // מסך ניצחון
+                if (_showWinScreen) _buildWinScreen(width, height),
 
                 // כפתור ביטול צעד אחרון
                 if (_gameState == "playing" && _currentTurnId == widget.myPlayFabId && _moveHistory.isNotEmpty)
@@ -952,6 +1004,110 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         child: value == 0
             ? Center(child: Icon(Icons.casino_outlined, color: Colors.white54, size: size * 0.55))
             : _buildDicePips(value, size),
+      ),
+    );
+  }
+
+  Widget _buildWinScreen(double width, double height) {
+    final coinsAwarded = _winnerIsMe ? widget.betAmount * 2 : 0;
+    final winnerLabel = _winnerIsMe ? widget.myName : widget.opponentName;
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.85),
+        child: Center(
+          child: Container(
+            width: width * 0.65,
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0A192F), Color(0xFF1A3A5C)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.amber, width: 2.5),
+              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, spreadRadius: 5)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _winnerIsMe ? Icons.emoji_events : Icons.sentiment_dissatisfied,
+                  color: _winnerIsMe ? Colors.amber : Colors.grey,
+                  size: 72,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _winnerIsMe ? "ניצחת!" : "הפסדת",
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: _winnerIsMe ? Colors.amber : Colors.white60,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  winnerLabel,
+                  style: const TextStyle(fontSize: 20, color: Colors.white70),
+                ),
+                const SizedBox(height: 28),
+                if (_winnerIsMe) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black38,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.monetization_on, color: Colors.amber, size: 26),
+                            const SizedBox(width: 8),
+                            Text(
+                              "+$coinsAwarded מטבעות",
+                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.amber),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.star, color: Colors.lightBlueAccent, size: 22),
+                            SizedBox(width: 8),
+                            Text("+25 XP", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.lightBlueAccent)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                ] else
+                  const SizedBox(height: 28),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _winnerIsMe ? Colors.amber : Colors.blueGrey,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                  onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                  child: Text(
+                    "חזור למסך הבית",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _winnerIsMe ? Colors.black : Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
