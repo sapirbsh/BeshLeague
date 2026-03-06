@@ -6,7 +6,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:besh_league/screens/auth_screen.dart';
 import 'package:besh_league/screens/about_screen.dart'; 
 import 'package:besh_league/screens/pre_game_screen.dart';
-import 'package:besh_league/screens/daily_streak_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 
@@ -976,21 +975,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTopBar(double width, double height, EdgeInsets safePadding) {
+    final barH = (height * 0.09).clamp(36.0, 60.0);
+    final fs = (height * 0.036).clamp(10.0, 15.0);
+    final iconSz = (height * 0.045).clamp(16.0, 22.0);
     return Container(
-      width: double.infinity, height: height * 0.12 + safePadding.top, color: Colors.black, padding: EdgeInsets.only(top: safePadding.top, left: width * 0.02, right: width * 0.02),
+      width: double.infinity,
+      height: barH + safePadding.top,
+      color: Colors.black,
+      padding: EdgeInsets.only(top: safePadding.top, left: width * 0.015, right: width * 0.015),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(playfabUsername, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-          const Text("ליגה - בקרוב", style: TextStyle(color: Colors.white54, fontSize: 16, fontStyle: FontStyle.italic)),
-          Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$coins מטבעות", style: const TextStyle(color: Colors.white, fontSize: 16))]),
-          Row(children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 24), const SizedBox(width: 5), Text("$trophies גביעים", style: const TextStyle(color: Colors.white, fontSize: 16))]),
-          IconButton(icon: const Icon(Icons.settings, color: Colors.white, size: 28), onPressed: _showSettingsMenu),
+          Flexible(child: Text(playfabUsername, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: fs, fontWeight: FontWeight.bold))),
+          Text("ליגה - בקרוב", style: TextStyle(color: Colors.white54, fontSize: fs * 0.85, fontStyle: FontStyle.italic)),
+          Row(children: [Icon(Icons.monetization_on, color: Colors.amber, size: iconSz), const SizedBox(width: 3), Text("$coins", style: TextStyle(color: Colors.white, fontSize: fs))]),
+          Row(children: [Icon(Icons.emoji_events, color: Colors.amber, size: iconSz), const SizedBox(width: 3), Text("$trophies", style: TextStyle(color: Colors.white, fontSize: fs))]),
+          IconButton(icon: Icon(Icons.settings, color: Colors.white, size: iconSz), onPressed: _showSettingsMenu, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           IconButton(
-            icon: const Icon(Icons.calendar_today, color: Colors.white, size: 28),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => DailyStreakScreen(sessionTicket: widget.sessionTicket))),
+            icon: Icon(Icons.calendar_today, color: Colors.white, size: iconSz),
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("כניסה יומית - בקרוב!", textAlign: TextAlign.right))),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
-          Image.asset('assets/logo.png', height: height * 0.08),
+          Image.asset('assets/logo.png', height: barH * 0.75),
         ],
       ),
     );
@@ -1087,6 +1094,48 @@ Widget _buildLeftMenu(double width, double height) {
     return Container(width: size, height: size, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black, width: 2)), child: Icon(icon, size: size * 0.5, color: Colors.black));
   }
 
+  Widget _buildXpBar() {
+    const xpPerLevel = 100;
+    final level = xp ~/ xpPerLevel + 1;
+    final relXp = xp % xpPerLevel;
+    final progress = relXp / xpPerLevel;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange, width: 1.5),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(children: [
+                const Icon(Icons.star, color: Colors.orange, size: 13),
+                const SizedBox(width: 4),
+                Text("רמה $level", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
+              ]),
+              Text("$relXp / $xpPerLevel XP", style: const TextStyle(fontSize: 10, color: Colors.white70)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.grey[700],
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
+              minHeight: 9,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCenterProfile(double width, double height) {
     return Column(
       mainAxisSize: MainAxisSize.min, // קריטי כדי שהפרופיל לא יימתח על כל המסך
@@ -1107,12 +1156,12 @@ Widget _buildLeftMenu(double width, double height) {
               Container(width: width * 0.25, color: Colors.white, child: Table(border: TableBorder.all(color: Colors.black, width: 2), children: [TableRow(children: [_buildTableCell("נצחונות", true), _buildTableCell("הפסדים", true)]), TableRow(children: [_buildTableCell("$totalWins", false), _buildTableCell("$totalLosses", false)])])),
               const Spacer(),
               Directionality(textDirection: TextDirection.ltr, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 35), const SizedBox(width: 10), Text("X  $trophies", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black))])),
-              const SizedBox(height: 6),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.star, color: Colors.orange, size: 22), const SizedBox(width: 6), Text("$xp XP", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54))]),
             ],
           ),
         ),
-        SizedBox(height: height * 0.05), // מרווח יחסי
+        const SizedBox(height: 6),
+        _buildXpBar(),
+        const SizedBox(height: 6),
         Container(
           width: width * 0.35, height: height * 0.12, decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.ondemand_video, size: 30), const SizedBox(width: 8), Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Text("קבל 50 מטבעות", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Text("נותרו 2 צפיות", style: TextStyle(fontSize: 12))])]),
