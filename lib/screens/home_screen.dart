@@ -22,7 +22,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String playfabUsername = "טוען..."; 
   String userEmail = ""; 
-  bool _isFriendsPanelOpen = false; // שולט האם פאנל החברים מוצג
+  bool _isFriendsPanelOpen = false;
+  bool _isNavigatingToGame = false;
   int coins = 0;
   int trophies = 0; 
   String lastLogin = "טוען...";
@@ -236,10 +237,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   myName: playfabUsername,
                   myTrophies: trophies,
                   opponentName: duelStatus!['opponent'].toString(),
-                  opponentId: duelStatus!['opponentId']?.toString() ?? "",
+                  opponentId: duelStatus['opponentId']?.toString() ?? "",
                   opponentTrophies: 0,
                   betAmount: acceptedBet,
-                  roomId: duelStatus!['roomId']?.toString() ?? "",
+                  roomId: duelStatus['roomId']?.toString() ?? "",
                 ),
               ),
             );
@@ -998,16 +999,15 @@ Widget _buildLeftMenu(double width, double height) {
         ),
         Container(
           width: double.infinity, height: height * 0.16,
-          decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFE040FB), Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
+          decoration: BoxDecoration(gradient: LinearGradient(colors: _isNavigatingToGame ? [Colors.grey.shade600, Colors.grey.shade700] : [const Color(0xFFE040FB), const Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
           child: InkWell(
             onTap: () async {
-               // בודק אם יש למשתמש 50 מטבעות למשחק
+               if (_isNavigatingToGame) return;
                if (coins < 50) {
                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אין לך מספיק מטבעות למשחק. (נדרש 50)", textAlign: TextAlign.right), backgroundColor: Colors.redAccent));
                  return;
                }
-               
-               // פותח את מסך ההכנה במצב "חיפוש אקראי"
+               setState(() { _isNavigatingToGame = true; });
                await Navigator.push(
                  context,
                  MaterialPageRoute(
@@ -1025,8 +1025,13 @@ Widget _buildLeftMenu(double width, double height) {
                    )
                  )
                );
+               if (mounted) setState(() { _isNavigatingToGame = false; });
             },
-            child: const Center(child: FittedBox(fit: BoxFit.scaleDown, child: Padding(padding: EdgeInsets.all(8.0), child: Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic))))),
+            child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
+              const SizedBox(height: 2),
+              Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 16), SizedBox(width: 3), Text("50", style: TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold))]),
+            ])),
           ),
         ),
       ],

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import '../services/live_game_service.dart';
 import '../services/bot_service.dart';
@@ -66,8 +68,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   int _myBorneOff = 0;
   int _oppBorneOff = 0;
   
-  int? _selectedPoint; 
-  Set<int> _validDestinations = {}; 
+  int? _selectedPoint;
+  Set<int> _validDestinations = {};
+  final List<Map<String, dynamic>> _moveHistory = []; 
 
   @override
   void initState() {
@@ -76,12 +79,14 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     
     if (widget.roomId.isEmpty || widget.sessionTicket.isEmpty) {
       _isSimulation = true;
-      _currentTurnId = widget.myPlayFabId; 
+      _currentTurnId = widget.myPlayFabId;
     } else {
       _liveGameService = LiveGameService(sessionTicket: widget.sessionTicket, roomId: widget.roomId);
       _liveGameService!.gameStateStream.listen(_handleServerUpdate);
       _liveGameService!.startListening();
     }
+    // ניכוי 50 מטבעות כשהמשחק מתחיל בפועל
+    _deductBetCoins();
   }
 
   void _initBoard() {
@@ -164,6 +169,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       _selectedPoint = null;
       _validDestinations.clear();
     });
+
+    _moveHistory.clear();
 
     _turnTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timeLeft > 0) {
@@ -352,7 +359,28 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     return false;
   }
 
+  void _undoLastMove() {
+    if (_moveHistory.isEmpty) return;
+    final snap = _moveHistory.removeLast();
+    setState(() {
+      _board = List<int>.from(snap['board']);
+      _myBar = snap['myBar'];
+      _oppBar = snap['oppBar'];
+      _myBorneOff = snap['myBorneOff'];
+      _availableMoves = List<int>.from(snap['availableMoves']);
+      _selectedPoint = null;
+      _validDestinations.clear();
+    });
+  }
+
   void _executeMove(int dest) {
+    _moveHistory.add({
+      'board': List<int>.from(_board),
+      'myBar': _myBar,
+      'oppBar': _oppBar,
+      'myBorneOff': _myBorneOff,
+      'availableMoves': List<int>.from(_availableMoves),
+    });
     setState(() {
       int source = _selectedPoint!;
       int moveDistance = source - dest;
@@ -370,7 +398,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         _board[source]--;
       } else {
         _availableMoves.remove(moveDistance);
-        if (source == 24) _myBar--; else _board[source]--;
+        if (source == 24) {
+          _myBar--;
+        } else {
+          _board[source]--;
+        }
 
         if (_board[dest] == -1) { 
           _board[dest] = 1;
@@ -420,9 +452,32 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     });
   }
 
+  Future<void> _deductBetCoins() async {
+    if (widget.sessionTicket.isEmpty) return;
+    try {
+      await http.post(
+        Uri.parse('https://1A15A2.playfabapi.com/Client/SubtractUserVirtualCurrency'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({"VirtualCurrency": "CO", "Amount": widget.betAmount}),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _awardWinner() async {
+    if (widget.sessionTicket.isEmpty) return;
+    try {
+      await http.post(
+        Uri.parse('https://1A15A2.playfabapi.com/Client/AddUserVirtualCurrency'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({"VirtualCurrency": "CO", "Amount": 100}),
+      );
+    } catch (_) {}
+  }
+
   void _endGame({required String winnerName}) {
     setState(() { _gameState = "gameOver"; });
     _turnTimer?.cancel();
+    if (winnerName == widget.myName) _awardWinner();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -448,17 +503,40 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E2328),
-        title: const Text("יציאה מהמשחק", textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text("האם אתה בטוח שברצונך לצאת?\nהחדר ייסגר והמשחק יסתיים.", textAlign: TextAlign.right, style: TextStyle(color: Colors.white70, fontSize: 16)),
+        title: const Text("לפרוש מהמשחק?", textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: const [
+            Text("אם תפרוש:", textAlign: TextAlign.right, style: TextStyle(color: Colors.white70, fontSize: 15)),
+            SizedBox(height: 8),
+            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              Text("יירדו לך 50 מטבעות", style: TextStyle(color: Colors.redAccent, fontSize: 15, fontWeight: FontWeight.bold)),
+              SizedBox(width: 6),
+              Icon(Icons.monetization_on, color: Colors.redAccent, size: 18),
+            ]),
+            SizedBox(height: 4),
+            Text("היריב יזכה בניצחון טכני", textAlign: TextAlign.right, style: TextStyle(color: Colors.orange, fontSize: 15)),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("ביטול", style: TextStyle(color: Colors.grey, fontSize: 16))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("המשך במשחק", style: TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.bold))),
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx); 
-              if (!_isSimulation) _liveGameService?.closeRoom(); 
-              Navigator.of(context).popUntil((route) => route.isFirst); 
-            }, 
-            child: const Text("צא מהמשחק", style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold))
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (widget.sessionTicket.isNotEmpty) {
+                try {
+                  await http.post(
+                    Uri.parse('https://1A15A2.playfabapi.com/Client/SubtractUserVirtualCurrency'),
+                    headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+                    body: json.encode({"VirtualCurrency": "CO", "Amount": 50}),
+                  );
+                } catch (_) {}
+              }
+              if (!_isSimulation) _liveGameService?.closeRoom();
+              if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+            child: const Text("פרוש", style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -478,11 +556,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             return Stack(
               children: [
                 Positioned.fill(child: Image.asset('assets/background_dark.png', fit: BoxFit.cover)),
-                // כפתור איקס ליציאה מהמשחק
-                Positioned(
-                  top: height * 0.05, right: width * 0.02,
-                  child: IconButton(icon: const Icon(Icons.close, color: Colors.white70, size: 35), onPressed: _confirmExitDialog),
-                ),
                 Row(
                   children: [
                     SizedBox(width: width * 0.18, child: _buildMyPanel()),
@@ -490,6 +563,32 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                     SizedBox(width: width * 0.18, child: _buildOpponentPanel()),
                   ],
                 ),
+
+                // כפתור ביטול צעד אחרון
+                if (_gameState == "playing" && _currentTurnId == widget.myPlayFabId && _moveHistory.isNotEmpty)
+                  Positioned(
+                    bottom: height * 0.04,
+                    left: width * 0.18 + 8,
+                    child: GestureDetector(
+                      onTap: _undoLastMove,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.75),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.amber, width: 1.5),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.undo, color: Colors.amber, size: 18),
+                            SizedBox(width: 5),
+                            Text("בטל צעד", style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             );
           },
@@ -508,7 +607,17 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         children: [
           Container(width: 70, height: 70, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isMyTurn ? Colors.greenAccent : Colors.white, width: 3), boxShadow: isMyTurn ? [const BoxShadow(color: Colors.greenAccent, blurRadius: 10)] : []), child: const Icon(Icons.person, color: Colors.white, size: 40)),
           const SizedBox(height: 5),
-          Text(widget.myName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(widget.myName, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          if (isMyTurn)
+            GestureDetector(
+              onTap: _confirmExitDialog,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFFB73E3E), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.black54, width: 1)),
+                child: const Text("לפרוש", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+            ),
           const Spacer(),
           if (isMyTurn) ...[const Icon(Icons.hourglass_bottom, color: Colors.white, size: 28), Text("$_timeLeft", style: TextStyle(color: _timeLeft <= 10 ? Colors.red : Colors.white, fontSize: 32, fontWeight: FontWeight.bold))] else const SizedBox(height: 60),
           const SizedBox(height: 10),
@@ -766,10 +875,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           final int remaining = _availableMoves.where((m) => m == _die1).length;
           return Row(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(4, (i) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: _buildDice(_die1, size: diceSize * 0.85, consumed: i >= remaining),
-            )),
+            children: [
+              _buildDice(_die1, size: diceSize, consumed: remaining <= 2),
+              const SizedBox(width: 8),
+              _buildDice(_die2, size: diceSize, consumed: remaining == 0),
+            ],
           );
         }
         return Row(
