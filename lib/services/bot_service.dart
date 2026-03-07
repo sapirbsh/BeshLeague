@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:convert'; // חובה בשביל ה-JSON
 
 enum BotSkill { starter, good, advanced }
 
@@ -11,8 +12,8 @@ class BotPlayer {
 }
 
 class BotMove {
-  final int source; // 0-23 for board, 25 = bar (opponent's bar)
-  final int dest;   // 0-23 for board, 24 = bear off
+  final int source; 
+  final int dest;   
 
   const BotMove(this.source, this.dest);
 }
@@ -20,86 +21,79 @@ class BotMove {
 class BotService {
   static final Random _random = Random();
 
-  static const List<BotPlayer> _allBots = [
-    // --- Starter tier (50–150 trophies) ---
-    BotPlayer(name: "Kobi88",    trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Moshiko",   trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Shlomit_T", trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Dganit",    trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Eli_Paz",   trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Yossi_K",   trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Batya22",   trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Roni_B",    trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Nurit_L",   trophies: 0, skill: BotSkill.starter),
-    BotPlayer(name: "Avi_S",     trophies: 0, skill: BotSkill.starter),
-
-    // --- Good tier ---
-    BotPlayer(name: "Barak_G",   trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Tamar_H",   trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Dvir99",    trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "ShirK",     trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Itamar_Z",  trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Noa_Ben",   trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Gal_Or",    trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Reef_A",    trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Yam_Levi",  trophies: 0, skill: BotSkill.good),
-    BotPlayer(name: "Dana_R",    trophies: 0, skill: BotSkill.good),
-
-    // --- Advanced tier ---
-    BotPlayer(name: "Omri_Pro",  trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Hila_X",    trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Saar77",    trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Lior_Ace",  trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Ori_King",  trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Rotem_Z",   trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Niv_G",     trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Shaked_A",  trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Tom_Elite", trophies: 0, skill: BotSkill.advanced),
-    BotPlayer(name: "Bar_M",     trophies: 0, skill: BotSkill.advanced),
+  // הרשימה כבר לא "const", כי אנחנו נאפשר לשרת לעדכן אותה בלייב!
+  // אבל נשאיר כאן את הבוטים כגיבוי התחלתי למקרה שהאינטרנט איטי.
+  static List<BotPlayer> _allBots = const [
+    BotPlayer(name: "Kobi88",    trophies: 50, skill: BotSkill.starter),
+    BotPlayer(name: "Moshiko",   trophies: 60, skill: BotSkill.starter),
+    BotPlayer(name: "Barak_G",   trophies: 300, skill: BotSkill.good),
+    BotPlayer(name: "Omri_Pro",  trophies: 1200, skill: BotSkill.advanced),
+    BotPlayer(name: "Saar77",    trophies: 1400, skill: BotSkill.advanced),
   ];
+
+  // ==============================================================
+  // הפונקציה החדשה והחשובה - מעדכנת את הבוטים מהשרת בזמן אמת!
+  // ==============================================================
+  static void updateBotsFromServer(String jsonString) {
+    try {
+      final List<dynamic> data = json.decode(jsonString);
+      final List<BotPlayer> loadedBots = [];
+      
+      for (var b in data) {
+        BotSkill parsedSkill = BotSkill.starter;
+        if (b['skill'] == 'good') parsedSkill = BotSkill.good;
+        if (b['skill'] == 'advanced') parsedSkill = BotSkill.advanced;
+
+        loadedBots.add(BotPlayer(
+          name: b['name'] ?? 'Bot',
+          trophies: b['trophies'] ?? 0,
+          skill: parsedSkill,
+        ));
+      }
+      
+      // מחליף את רשימת הגיבוי ברשימה המלאה שהגיעה מממשק הניהול
+      if (loadedBots.isNotEmpty) {
+        _allBots = loadedBots;
+      }
+    } catch (e) {
+      print("Error loading bots from server: $e");
+    }
+  }
 
   static BotPlayer getRandomBot() {
     return _allBots[_random.nextInt(_allBots.length)];
   }
 
-  /// Delay before the bot clicks "ready" on the pre-game screen
   static Duration getReadyDelay(BotSkill skill) {
     switch (skill) {
       case BotSkill.starter:
-        return Duration(milliseconds: 3000 + _random.nextInt(3000)); // 3–6s
+        return Duration(milliseconds: 3000 + _random.nextInt(3000));
       case BotSkill.good:
-        return Duration(milliseconds: 2000 + _random.nextInt(2000)); // 2–4s
+        return Duration(milliseconds: 2000 + _random.nextInt(2000));
       case BotSkill.advanced:
-        return Duration(milliseconds: 1000 + _random.nextInt(1500)); // 1–2.5s
+        return Duration(milliseconds: 1000 + _random.nextInt(1500));
     }
   }
 
-  /// Delay before the bot starts selecting its move during a turn
   static Duration getThinkDelay(BotSkill skill) {
     switch (skill) {
       case BotSkill.starter:
-        return Duration(milliseconds: 1500 + _random.nextInt(1500)); // 1.5–3s
+        return Duration(milliseconds: 1500 + _random.nextInt(1500));
       case BotSkill.good:
-        return Duration(milliseconds: 1000 + _random.nextInt(1500)); // 1–2.5s
+        return Duration(milliseconds: 1000 + _random.nextInt(1500));
       case BotSkill.advanced:
-        return Duration(milliseconds: 500 + _random.nextInt(1300));  // 0.5–1.8s
+        return Duration(milliseconds: 500 + _random.nextInt(1300)); 
     }
   }
 
-  /// Returns all valid (source, dest) moves for the bot (opponent, negative pieces).
-  /// Bot pieces are negative on the board and move from low index → high index.
-  /// source == 25 means the bot's bar.
-  /// dest == 24 means bear off.
-static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves, int oppBar) {
+  static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves, int oppBar) {
     List<BotMove> moves = [];
     if (availableMoves.isEmpty) return moves;
 
     bool canBearOff = _canBotBearOff(board, oppBar);
-
     Set<int> uniqueMoves = availableMoves.toSet();
 
     if (oppBar > 0) {
-      // Must enter from bar
       for (int mv in uniqueMoves) {
         int dest = mv - 1;
         if (dest >= 0 && dest <= 23 && board[dest] <= 1) {
@@ -110,19 +104,15 @@ static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves,
     }
 
     for (int src = 0; src < 24; src++) {
-      if (board[src] >= 0) continue; // no bot piece here
+      if (board[src] >= 0) continue; 
       for (int mv in uniqueMoves) {
         int dest = src + mv;
         if (dest <= 23) {
-          // מותר לבוט לזוז למשבצת ריקה (0), משבצת עם כלי יריב אחד (1) או משבצת שלו (<0)
-          if (board[dest] <= 1) {
-            moves.add(BotMove(src, dest));
-          }
+          if (board[dest] <= 1) moves.add(BotMove(src, dest));
         } else if (canBearOff) {
           if (dest == 24) {
             moves.add(BotMove(src, 24));
           } else {
-            // תיקון חוק הוצאת כלים: מותר להוציא כלי מאחורה רק אם אין כלים במשבצות רחוקות יותר
             bool pieceOnLower = false;
             for (int i = 18; i < src; i++) {
               if (board[i] < 0) { pieceOnLower = true; break; }
@@ -134,6 +124,7 @@ static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves,
     }
     return moves;
   }
+
   static bool _canBotBearOff(List<int> board, int oppBar) {
     if (oppBar > 0) return false;
     for (int i = 0; i < 18; i++) {
@@ -142,8 +133,6 @@ static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves,
     return true;
   }
 
-  /// Select the best move for the bot given its skill level.
-  /// Returns null if no valid moves exist.
   static BotMove? selectBotMove(List<int> board, List<int> availableMoves, int oppBar, BotSkill skill) {
     final validMoves = getValidBotMoves(board, availableMoves, oppBar);
     if (validMoves.isEmpty) return null;
@@ -151,15 +140,11 @@ static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves,
     switch (skill) {
       case BotSkill.starter:
         return validMoves[_random.nextInt(validMoves.length)];
-
       case BotSkill.good:
-        // Prefer hitting human blots, else pick random
         final hittingMoves = validMoves.where((m) => m.dest < 24 && board[m.dest] == 1).toList();
         if (hittingMoves.isNotEmpty) return hittingMoves[_random.nextInt(hittingMoves.length)];
         return validMoves[_random.nextInt(validMoves.length)];
-
       case BotSkill.advanced:
-        // Score each move and pick the best
         BotMove best = validMoves.first;
         int bestScore = -999;
         for (final move in validMoves) {
@@ -171,12 +156,11 @@ static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves,
   }
 
   static int _scoreBotMove(List<int> board, BotMove move) {
-    if (move.dest == 24) return 15; // bearing off is great
+    if (move.dest == 24) return 15; 
     int score = 0;
     final dest = move.dest;
-    if (board[dest] == 1) score += 10;      // hitting a human blot
-    if (board[dest] < 0) score += 3;         // landing on own point (building prime)
-    // prefer moving forward (higher dest = better progress for bot)
+    if (board[dest] == 1) score += 10;      
+    if (board[dest] < 0) score += 3;         
     score += dest ~/ 6;
     return score;
   }
