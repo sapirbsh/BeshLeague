@@ -1145,9 +1145,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTopBar(double width, double height, EdgeInsets safePadding) {
-    final barH = (height * 0.09).clamp(36.0, 60.0);
-    final fs = (height * 0.036).clamp(10.0, 15.0);
-    final iconSz = (height * 0.045).clamp(16.0, 22.0);
+    final barH = (height * 0.065).clamp(30.0, 48.0);
+    final fs = (height * 0.032).clamp(10.0, 14.0);
+    final iconSz = (height * 0.04).clamp(16.0, 20.0);
     return Container(
       width: double.infinity,
       height: barH + safePadding.top,

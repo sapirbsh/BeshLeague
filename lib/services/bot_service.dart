@@ -90,7 +90,7 @@ class BotService {
   /// Bot pieces are negative on the board and move from low index → high index.
   /// source == 25 means the bot's bar.
   /// dest == 24 means bear off.
-  static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves, int oppBar) {
+static List<BotMove> getValidBotMoves(List<int> board, List<int> availableMoves, int oppBar) {
     List<BotMove> moves = [];
     if (availableMoves.isEmpty) return moves;
 
@@ -99,7 +99,7 @@ class BotService {
     Set<int> uniqueMoves = availableMoves.toSet();
 
     if (oppBar > 0) {
-      // Must enter from bar — bot enters at index (mv-1) from the human's home end
+      // Must enter from bar
       for (int mv in uniqueMoves) {
         int dest = mv - 1;
         if (dest >= 0 && dest <= 23 && board[dest] <= 1) {
@@ -114,30 +114,26 @@ class BotService {
       for (int mv in uniqueMoves) {
         int dest = src + mv;
         if (dest <= 23) {
-          if (board[dest] >= -1) { // empty, bot's own single, or human blot (==1) → wait, bot piece is negative so own = negative
-            // board[dest] <= 1 means: could be negative (bot's own), 0 (empty), or 1 (single human blot)
-            // board[dest] >= 2 means 2+ human pieces = blocked
-            if (board[dest] <= 1) {
-              moves.add(BotMove(src, dest));
-            }
+          // מותר לבוט לזוז למשבצת ריקה (0), משבצת עם כלי יריב אחד (1) או משבצת שלו (<0)
+          if (board[dest] <= 1) {
+            moves.add(BotMove(src, dest));
           }
         } else if (canBearOff) {
           if (dest == 24) {
             moves.add(BotMove(src, 24));
           } else {
-            // Overshoot: only valid if no bot pieces on higher-index points in home board
-            bool pieceOnHigher = false;
-            for (int i = src + 1; i <= 23; i++) {
-              if (board[i] < 0) { pieceOnHigher = true; break; }
+            // תיקון חוק הוצאת כלים: מותר להוציא כלי מאחורה רק אם אין כלים במשבצות רחוקות יותר
+            bool pieceOnLower = false;
+            for (int i = 18; i < src; i++) {
+              if (board[i] < 0) { pieceOnLower = true; break; }
             }
-            if (!pieceOnHigher) moves.add(BotMove(src, 24));
+            if (!pieceOnLower) moves.add(BotMove(src, 24));
           }
         }
       }
     }
     return moves;
   }
-
   static bool _canBotBearOff(List<int> board, int oppBar) {
     if (oppBar > 0) return false;
     for (int i = 0; i < 18; i++) {

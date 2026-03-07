@@ -120,7 +120,7 @@ class _AuthScreenState extends State<AuthScreen> {
             final screenWidth = constraints.maxWidth;
             final screenHeight = constraints.maxHeight;
 
-            final logoHeight = screenHeight * 0.22; 
+            final logoHeight = screenHeight * 0.32;
             final textFieldWidth = screenWidth * 0.35;
             final loginButtonWidth = screenWidth * 0.15;
             final registerButtonWidth = screenWidth * 0.18;

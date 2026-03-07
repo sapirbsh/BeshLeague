@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where flutter)",
+      "Read(//c/Users/user/**)",
+      "Bash(/c/Users/user/flutter/bin/flutter build apk --release)",
+      "Bash(flutter build apk --release)",
+      "Bash(cmd /c \"flutter build apk --release\")",
+      "Bash(export PATH=\"/c/Users/user/flutter/bin:$PATH\")",
+      "Bash(flutter --version)"
+    ]
+  }
+}

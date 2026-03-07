@@ -669,21 +669,23 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("המשך במשחק", style: TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.bold))),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (widget.sessionTicket.isNotEmpty) {
-                try {
-                  await http.post(
-                    Uri.parse('https://1A15A2.playfabapi.com/Client/SubtractUserVirtualCurrency'),
-                    headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-                    body: json.encode({"VirtualCurrency": "CO", "Amount": 50}),
-                  );
-                } catch (_) {}
+            onPressed: () => Navigator.pop(ctx), 
+            child: const Text("המשך במשחק", style: TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.bold))
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx); // סוגר את הפופ-אפ
+              
+              // סוגר את חדר הרשת - זה מה שמעניק ליריב את הניצחון הטכני
+              if (!_isSimulation) {
+                _liveGameService?.closeRoom();
               }
-              if (!_isSimulation) _liveGameService?.closeRoom();
-              if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+              
+              // יוצא מיד למסך הראשי (הכסף כבר ירד בתחילת המשחק אז אין צורך להוריד שוב)
+              if (mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             },
             child: const Text("פרוש", style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
           ),
@@ -1071,20 +1073,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   Widget _buildDiceArea({double cs = 30}) {
     final double diceSize = (cs * 1.15).clamp(24.0, 40.0);
-    final double smallDice = (diceSize * 0.82).clamp(20.0, 34.0);
 
-    // Helper: build dice row for doubles (4 dice)
-    Widget buildDoublesDice(int val, int remaining, double sz) {
-      return Row(mainAxisSize: MainAxisSize.min, children: [
-        _buildDice(val, size: sz, consumed: remaining < 4),
-        const SizedBox(width: 3),
-        _buildDice(val, size: sz, consumed: remaining < 3),
-        const SizedBox(width: 3),
-        _buildDice(val, size: sz, consumed: remaining < 2),
-        const SizedBox(width: 3),
-        _buildDice(val, size: sz, consumed: remaining < 1),
-      ]);
-    }
 
     // MY TURN
     if (_currentTurnId == widget.myPlayFabId) {
@@ -1113,9 +1102,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         ]);
       } else {
         if (_die1 == _die2) {
-          final int remaining = _availableMoves.where((m) => m == _die1).length;
-          return buildDoublesDice(_die1, remaining, smallDice);
-        }
+  final int remaining = _availableMoves.where((m) => m == _die1).length;
+  return Row(mainAxisSize: MainAxisSize.min, children: [
+    _buildDice(_die1, size: diceSize, consumed: remaining < 3), // תהפוך לאפורה אחרי 2 צעדים
+    const SizedBox(width: 8),
+    _buildDice(_die2, size: diceSize, consumed: remaining < 1), // תהפוך לאפורה אחרי 4 צעדים
+  ]);
+}
         return Row(mainAxisSize: MainAxisSize.min, children: [
           _buildDice(_die1, size: diceSize, consumed: !_availableMoves.contains(_die1)),
           const SizedBox(width: 8),
@@ -1133,9 +1126,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       ]);
     }
     if (_die1 == _die2 && _hasRolledThisTurn) {
-      final int remaining = _availableMoves.where((m) => m == _die1).length;
-      return buildDoublesDice(_die1, remaining, smallDice);
-    }
+  final int remaining = _availableMoves.where((m) => m == _die1).length;
+  return Row(mainAxisSize: MainAxisSize.min, children: [
+    _buildDice(_die1, size: diceSize, consumed: remaining < 3),
+    const SizedBox(width: 8),
+    _buildDice(_die2, size: diceSize, consumed: remaining < 1),
+  ]);
+}
     return Row(mainAxisSize: MainAxisSize.min, children: [
       _buildDice(_die1, size: diceSize, consumed: _hasRolledThisTurn && !_availableMoves.contains(_die1)),
       const SizedBox(width: 8),
