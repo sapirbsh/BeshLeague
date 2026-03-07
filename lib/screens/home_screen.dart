@@ -264,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   roomId: duelStatus['roomId']?.toString() ?? "",
                 ),
               ),
-            );
+            ).then((_) { if (mounted) _fetchPlayerData(); });
           }
         }
 
@@ -630,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
               betAmount: betAmt,
             ),
           ),
-        );
+        ).then((_) { if (mounted) _fetchPlayerData(); });
       }
     }
   }
@@ -1158,9 +1158,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTopBar(double width, double height, EdgeInsets safePadding) {
-    final barH = (height * 0.065).clamp(30.0, 48.0);
-    final fs = (height * 0.032).clamp(10.0, 14.0);
-    final iconSz = (height * 0.04).clamp(16.0, 20.0);
+    final barH = (height * 0.055).clamp(28.0, 42.0);   // shorter bar
+    final fs = (height * 0.038).clamp(12.0, 16.0);      // larger font
+    final iconSz = (height * 0.050).clamp(20.0, 26.0);  // larger icons
     return Container(
       width: double.infinity,
       height: barH + safePadding.top,
@@ -1180,7 +1180,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
-          Image.asset('assets/logo.png', height: barH * 0.75),
+          Image.asset('assets/logo.png', height: barH * 0.85),
         ],
       ),
     );
@@ -1215,12 +1215,12 @@ Widget _buildLeftMenu(double width, double height) {
                 },
                 child: Center(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center, 
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.ondemand_video, size: 28, color: Colors.black87), 
-                      const SizedBox(height: 2), 
-                      const Text("צפה", style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
                       Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 14), SizedBox(width: 2), Text("+50", style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.bold))]),
+                      const SizedBox(height: 2),
+                      const Icon(Icons.ondemand_video, size: 28, color: Colors.black87),
+                      const Text("צפה", style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
                     ]
                   )
                 ),
@@ -1257,7 +1257,10 @@ Widget _buildLeftMenu(double width, double height) {
                        )
                      )
                    );
-                   if (mounted) setState(() { _isNavigatingToGame = false; });
+                   if (mounted) {
+                     setState(() { _isNavigatingToGame = false; });
+                     _fetchPlayerData(); // refresh coins/XP after returning from game
+                   }
                 },
                 child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),

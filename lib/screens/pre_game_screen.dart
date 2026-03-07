@@ -315,7 +315,7 @@ class _PreGameScreenState extends State<PreGameScreen> {
 
                 if (isCountingDown)
                   Container(
-                    color: Colors.black.withOpacity(0.7), width: double.infinity, height: double.infinity,
+                    color: Colors.black.withValues(alpha: 0.7), width: double.infinity, height: double.infinity,
                     child: Center(child: Text("$countdown", style: const TextStyle(fontSize: 150, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(color: Colors.blueAccent, blurRadius: 20)]))),
                   ),
               ],
@@ -356,15 +356,16 @@ class _PreGameScreenState extends State<PreGameScreen> {
         Container(
           width: height * 0.26, height: height * 0.26,
           decoration: BoxDecoration(color: Colors.grey[900], shape: BoxShape.circle, border: Border.all(color: Colors.white38, width: 4)),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(color: Colors.amber),
-                const SizedBox(height: 15),
-                Text("$searchCountdown", style: const TextStyle(fontSize: 45, fontWeight: FontWeight.bold, color: Colors.white)),
-              ],
-            ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: height * 0.20,
+                height: height * 0.20,
+                child: const CircularProgressIndicator(color: Colors.amber, strokeWidth: 4),
+              ),
+              Text("$searchCountdown", style: const TextStyle(fontSize: 45, fontWeight: FontWeight.bold, color: Colors.white)),
+            ],
           ),
         ),
         SizedBox(height: height * 0.05),

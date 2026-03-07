@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:convert';
@@ -84,12 +85,17 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   // --- rage quit ---
   bool _isRageQuitting = false;
 
+  // --- opponent dialog ---
+  bool _showOpponentDialog = false;
+
   // --- game timing ---
   late DateTime _gameStartTime;
   Duration _gameDuration = Duration.zero;
 
   // --- animation controllers ---
   late AnimationController _diceController;
+  late AnimationController _coinFlyController;
+  late Animation<double> _coinFlyAnim;
   late Animation<double> _diceShakeX;
   late Animation<double> _diceRotation;
 
@@ -168,6 +174,15 @@ class _GameBoardScreenState extends State<GameBoardScreen>
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.05), weight: 60),
     ]).animate(_rageController);
 
+    // coin fly (win celebration)
+    _coinFlyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _coinFlyAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _coinFlyController, curve: Curves.easeOut),
+    );
+
     // selected-checker pulse
     _pulseController = AnimationController(
       vsync: this,
@@ -202,6 +217,7 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     _diceController.dispose();
     _rageController.dispose();
     _pulseController.dispose();
+    _coinFlyController.dispose();
     _turnTimer?.cancel();
     if (!_isSimulation && _gameState == "gameOver") {
       _liveGameService?.closeRoom();
@@ -297,7 +313,7 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   // ─── initial roll ─────────────────────────────────────────────────────────
   void _rollInitialDice() {
     if (_isRolling || _isActionLocked) return;
-    _diceController.repeat(reverse: true);
+    // No dice shake on initial roll — just rapid number cycling
     setState(() { _isRolling = true; _isActionLocked = true; _centerMessage = "מטיל קוביות..."; });
     int rolls = 0;
     Timer.periodic(const Duration(milliseconds: 85), (timer) {
@@ -309,7 +325,6 @@ class _GameBoardScreenState extends State<GameBoardScreen>
       rolls++;
       if (rolls >= 18) {
         timer.cancel();
-        _diceController.stop(); _diceController.reset();
         setState(() { _isActionLocked = false; });
         _evaluateInitialRoll();
       }
@@ -363,6 +378,7 @@ class _GameBoardScreenState extends State<GameBoardScreen>
 
   void _handleTimeout() {
     bool becameBotTurn = false;
+    bool becameMyTurn = false;
     setState(() {
       if (_currentTurnId == widget.myPlayFabId) {
         _myStrikes++;
@@ -373,19 +389,28 @@ class _GameBoardScreenState extends State<GameBoardScreen>
         _opponentStrikes++;
         if (_opponentStrikes >= 2) { _endGame(winnerName: widget.myName); return; }
         _currentTurnId = widget.myPlayFabId;
+        becameMyTurn = true;
       }
       _startTurnTimer();
     });
+    if (becameMyTurn) {
+      HapticFeedback.mediumImpact();
+      if (_showOpponentDialog) setState(() { _showOpponentDialog = false; });
+    }
     if (becameBotTurn) _scheduleBotTurn();
   }
 
   void _endTurn() {
     if (_isActionLocked) return;
-    setState(() { _isActionLocked = true; });
+    setState(() { _isActionLocked = true; _floatingMessage = null; });
     Future.delayed(const Duration(milliseconds: 800), () {
       if (!mounted) return;
       final nextTurn = (_currentTurnId == widget.myPlayFabId) ? widget.opponentId : widget.myPlayFabId;
+      if (nextTurn == widget.myPlayFabId) HapticFeedback.mediumImpact();
       setState(() { _currentTurnId = nextTurn; _isActionLocked = false; });
+      if (_showOpponentDialog && nextTurn == widget.myPlayFabId) {
+        setState(() { _showOpponentDialog = false; });
+      }
       _startTurnTimer();
       if (_isBotMatch && nextTurn == widget.opponentId) _scheduleBotTurn();
     });
@@ -812,10 +837,14 @@ class _GameBoardScreenState extends State<GameBoardScreen>
           _bestWinStreak = bestWinStreak;
           _showWinScreen = true;
         });
+        if (iWon) _coinFlyController.forward();
       }
     } catch (e) {
       debugPrint("Error in _awardXPAndCoins: $e");
-      if (mounted) setState(() { _showWinScreen = true; });
+      if (mounted) {
+        setState(() { _showWinScreen = true; });
+        if (iWon) _coinFlyController.forward();
+      }
     }
   }
 
@@ -844,6 +873,9 @@ class _GameBoardScreenState extends State<GameBoardScreen>
                     SizedBox(width: width * 0.18, child: _buildOpponentPanel()),
                   ],
                 ),
+
+                // opponent profile dialog overlay
+                if (_showOpponentDialog) _buildOpponentProfileOverlay(width, height),
 
                 // win screen overlay
                 if (_showWinScreen) _buildWinScreen(width, height),
@@ -1015,17 +1047,20 @@ class _GameBoardScreenState extends State<GameBoardScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: 70, height: 70,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: isOpponentTurn ? Colors.redAccent : Colors.white, width: 3),
-              boxShadow: isOpponentTurn
-                  ? [const BoxShadow(color: Colors.redAccent, blurRadius: 14, spreadRadius: 2)]
-                  : [],
+          GestureDetector(
+            onTap: () => setState(() => _showOpponentDialog = !_showOpponentDialog),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 70, height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: isOpponentTurn ? Colors.redAccent : Colors.white, width: 3),
+                boxShadow: isOpponentTurn
+                    ? [const BoxShadow(color: Colors.redAccent, blurRadius: 14, spreadRadius: 2)]
+                    : [],
+              ),
+              child: const Icon(Icons.person, color: Colors.white, size: 40),
             ),
-            child: const Icon(Icons.person, color: Colors.white, size: 40),
           ),
           const SizedBox(height: 5),
           Text(widget.opponentName,
@@ -1368,6 +1403,8 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     final double diceSize = (cs * 1.15).clamp(24.0, 40.0);
 
     if (_currentTurnId == widget.myPlayFabId) {
+      // Show rolling animation (actual die values) as soon as roll starts
+      if (_isRolling) return _buildDiceRow(diceSize);
       if (!_hasRolledThisTurn) {
         return Row(mainAxisSize: MainAxisSize.min, children: [
           Opacity(opacity: 0.35, child: _buildDiceWidget(0, size: diceSize)),
@@ -1381,14 +1418,12 @@ class _GameBoardScreenState extends State<GameBoardScreen>
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 6, shadowColor: Colors.amber,
             ),
-            onPressed: (_isRolling || _isActionLocked) ? null : _rollPlayingDice,
-            child: _isRolling
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                : const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.casino, color: Colors.black, size: 16),
-                    SizedBox(width: 4),
-                    Text("זרוק", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
-                  ]),
+            onPressed: _isActionLocked ? null : _rollPlayingDice,
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.casino, color: Colors.black, size: 16),
+              SizedBox(width: 4),
+              Text("זרוק", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+            ]),
           ),
         ]);
       }
@@ -1526,6 +1561,75 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     return opacity;
   }
 
+  // ─── opponent profile overlay ─────────────────────────────────────────────
+  Widget _buildOpponentProfileOverlay(double width, double height) {
+    return Positioned(
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: width * 0.28,
+      child: GestureDetector(
+        onTap: () => setState(() => _showOpponentDialog = false),
+        child: Container(
+          color: Colors.transparent,
+          alignment: Alignment.center,
+          child: GestureDetector(
+            onTap: () {}, // prevent tap-through
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 30, horizontal: 10),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white24, width: 1.5),
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 16)],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64, height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white38, width: 2),
+                    ),
+                    child: const Icon(Icons.person, color: Colors.white70, size: 40),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(widget.opponentName,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 10),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.emoji_events, color: Colors.amber, size: 18),
+                    const SizedBox(width: 5),
+                    Text("${widget.opponentTrophies}",
+                        style: const TextStyle(color: Colors.amber, fontSize: 15,
+                            fontWeight: FontWeight.bold)),
+                  ]),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: () => setState(() => _showOpponentDialog = false),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text("סגור",
+                          style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ─── win/loss screen ──────────────────────────────────────────────────────
   Widget _buildWinScreen(double width, double height) {
     final coinsAwarded = _winnerIsMe ? widget.betAmount * 2 : 0;
@@ -1541,9 +1645,39 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     final durationStr = "$mins:${secs.toString().padLeft(2, '0')}";
 
     return Positioned.fill(
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.88),
-        child: Center(
+      child: Stack(
+        children: [
+          // semi-transparent backdrop (board visible behind)
+          Container(color: Colors.black.withValues(alpha: 0.65)),
+
+          // flying coins animation (winner only)
+          if (_winnerIsMe)
+            AnimatedBuilder(
+              animation: _coinFlyAnim,
+              builder: (ctx, _) {
+                return Stack(
+                  children: List.generate(6, (i) {
+                    final xFrac = 0.12 + i * 0.15;
+                    final yStart = height * 0.9;
+                    final yEnd = height * 0.1;
+                    final delay = i * 0.12;
+                    final progress = (_coinFlyAnim.value - delay).clamp(0.0, 1.0);
+                    final yPos = yStart - (yStart - yEnd) * progress;
+                    return Positioned(
+                      left: width * xFrac,
+                      top: yPos,
+                      child: Opacity(
+                        opacity: progress < 0.85 ? 1.0 : (1.0 - progress) / 0.15,
+                        child: const Icon(Icons.monetization_on,
+                            color: Colors.amber, size: 28),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+
+          Center(
           child: TweenAnimationBuilder<double>(
             tween: Tween<double>(begin: 0.55, end: 1.0),
             duration: const Duration(milliseconds: 400),
@@ -1797,8 +1931,9 @@ class _GameBoardScreenState extends State<GameBoardScreen>
             ),
           ),
         ),
-      ),
-    );
+      ],
+    ),
+  );
   }
 
   Widget _summaryTile(IconData icon, String value, String label, {Color color = Colors.white70}) {

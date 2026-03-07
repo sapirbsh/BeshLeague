@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:besh_league/screens/register_screen.dart';
-import 'package:besh_league/screens/home_screen.dart'; 
-import 'package:besh_league/screens/about_screen.dart'; 
+import 'package:besh_league/screens/home_screen.dart';
+import 'package:besh_league/screens/about_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -108,7 +109,12 @@ Future<void> _loginUser() async {
 
         setState(() { _isLoading = false; });
 
-        // 3. אם הכל תקין והוא לא חסום, מכניסים אותו למסך הבית
+        // 3. שומרים את פרטי ההתחברות לשימוש עתידי
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('sessionTicket', sessionTicket);
+        await prefs.setString('playFabId', playFabId);
+
+        // 4. אם הכל תקין והוא לא חסום, מכניסים אותו למסך הבית
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,

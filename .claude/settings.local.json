@@ -7,7 +7,10 @@
       "Bash(flutter build apk --release)",
       "Bash(cmd /c \"flutter build apk --release\")",
       "Bash(export PATH=\"/c/Users/user/flutter/bin:$PATH\")",
-      "Bash(flutter --version)"
+      "Bash(flutter --version)",
+      "Bash(powershell -Command \"Get-Command flutter -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path C:\\\\,D:\\\\ -Recurse -Filter ''flutter.bat'' -ErrorAction SilentlyContinue 2>null | Select-Object -First 3 FullName\")",
+      "Bash(/c/flutter/bin/flutter build apk --release)"
     ]
   }
 }
