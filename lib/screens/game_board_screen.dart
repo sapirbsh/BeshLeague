@@ -58,6 +58,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   int _die2 = 0;
   List<int> _availableMoves = [];
   bool _hasRolledThisTurn = false;
+  String? _floatingMessage;
 
   final Random _random = Random();
 
@@ -211,18 +212,21 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   }
 
   void _handleTimeout() {
+    bool becameBotTurn = false;
     setState(() {
       if (_currentTurnId == widget.myPlayFabId) {
         _myStrikes++;
         if (_myStrikes >= 2) { _endGame(winnerName: widget.opponentName); return; }
-        _currentTurnId = widget.opponentId; 
+        _currentTurnId = widget.opponentId;
+        becameBotTurn = _isBotMatch;
       } else {
         _opponentStrikes++;
         if (_opponentStrikes >= 2) { _endGame(winnerName: widget.myName); return; }
-        _currentTurnId = widget.myPlayFabId; 
+        _currentTurnId = widget.myPlayFabId;
       }
       _startTurnTimer();
     });
+    if (becameBotTurn) _scheduleBotTurn();
   }
 
   void _endTurn() {
@@ -234,6 +238,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       if (_isBotMatch && nextTurn == widget.opponentId) {
         _scheduleBotTurn();
       }
+    });
+  }
+
+  void _showFloatingMessage(String msg) {
+    setState(() { _floatingMessage = msg; });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() { _floatingMessage = null; });
     });
   }
 
@@ -350,8 +361,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         });
         
         if (!_hasAnyValidMove()) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אין מהלכים אפשריים!", textAlign: TextAlign.center)));
-          _endTurn();
+          _showFloatingMessage("אין מהלכים אפשריים!");
+          // Player presses "סיים תור" to end turn
         } else {
           _checkAndAutoMove();
         }
@@ -465,7 +476,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     });
 
     bool gameWon = false;
-    bool turnEnded = false;
 
     setState(() {
       int source = _selectedPoint!;
@@ -505,15 +515,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
       if (_myBorneOff == 15) {
         gameWon = true;
-      } else if (_availableMoves.isEmpty || !_hasAnyValidMove()) {
-        turnEnded = true;
       }
     });
 
     if (gameWon) {
       _endGame(winnerName: widget.myName);
-    } else if (turnEnded) {
-      _endTurn();
+    } else if (_availableMoves.isEmpty && !_hasAnyValidMove()) {
+      _showFloatingMessage("כל המהלכים נוצלו — לחץ 'סיים תור'");
     }
   }
 
@@ -703,7 +711,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.75),
+                          color: Colors.black.withValues(alpha: 0.75),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.amber, width: 1.5),
                         ),
@@ -714,6 +722,60 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                             SizedBox(width: 5),
                             Text("בטל צעד", style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
                           ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // כפתור "סיים תור" — מופיע רק בתור השחקן המקומי אחרי הטלה
+                if (_gameState == "playing" && _currentTurnId == widget.myPlayFabId && _hasRolledThisTurn)
+                  Positioned(
+                    bottom: height * 0.04,
+                    right: width * 0.18 + 8,
+                    child: GestureDetector(
+                      onTap: _endTurn,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1B5E20), Color(0xFF388E3C)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.greenAccent, width: 1.5),
+                          boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 6, offset: Offset(0, 3))],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                            SizedBox(width: 6),
+                            Text("סיים תור", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // הודעה צפה במרכז המסך (מופיעה 2 שניות ונעלמת)
+                if (_floatingMessage != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.88),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.amber, width: 2),
+                            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 12)],
+                          ),
+                          child: Text(
+                            _floatingMessage!,
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ),
@@ -1021,7 +1083,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         );
       }
     }
-    if (_isRolling) {
+    // Show opponent dice while rolling OR after rolling (so moves are visible to player)
+    if (_isRolling || (_hasRolledThisTurn && _currentTurnId == widget.opponentId)) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
