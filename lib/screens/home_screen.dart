@@ -934,9 +934,22 @@ class _HomeScreenState extends State<HomeScreen> {
             final safePadding = MediaQuery.of(context).padding;
 
             return Stack(
-              children: [
-                Image.asset('assets/background_light.png', fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-                
+            children: [
+              Image.asset('assets/background_light.png', fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+              
+              // --- חסימת המסך עד לטעינה מלאה ---
+              if (isLoadingData)
+                const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.amber, strokeWidth: 5),
+                      SizedBox(height: 20),
+                      Text("טוען את הנתונים...", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
+                    ],
+                  ),
+                )
+              else
                 Column(
                   children: [
                     // הפס השחור למעלה כולל שוליים בטוחים (נצמד לקצה העליון)
@@ -980,8 +993,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-              ],
-            );
+            ],
+          );
           },
         ),
       ),
@@ -1190,46 +1203,75 @@ Widget _buildLeftMenu(double width, double height) {
             ),
           ],
         ),
-        Container(
-          width: double.infinity, height: height * 0.16,
-          decoration: BoxDecoration(gradient: LinearGradient(colors: _isNavigatingToGame ? [Colors.grey.shade600, Colors.grey.shade700] : [const Color(0xFFE040FB), const Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
-          child: InkWell(
-            onTap: () async {
-               if (_isNavigatingToGame) return;
-               if (coins < 50) {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אין לך מספיק מטבעות למשחק. (נדרש 50)", textAlign: TextAlign.right), backgroundColor: Colors.redAccent));
-                 return;
-               }
-               setState(() { _isNavigatingToGame = true; });
-               await Navigator.push(
-                 context,
-                 MaterialPageRoute(
-                   builder: (context) => PreGameScreen(
-                     sessionTicket: widget.sessionTicket,
-                     roomId: "",
-                     myPlayFabId: widget.playFabId,
-                     myName: playfabUsername,
-                     myTrophies: trophies,
-                     opponentId: "",
-                     opponentName: "",
-                     opponentTrophies: 0,
-                     betAmount: 50,
-                     isRandomMatch: true,
-                   )
-                 )
-               );
-               if (mounted) setState(() { _isNavigatingToGame = false; });
-            },
-            child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
-              const SizedBox(height: 2),
-              Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 16), SizedBox(width: 3), Text("50", style: TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold))]),
-            ])),
-          ),
+        Column(
+          children: [
+            // --- כפתור צפייה בווידאו (באותו גובה של כפתור שחק) ---
+            Container(
+              width: double.infinity, height: height * 0.16,
+              decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
+              child: InkWell(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("צפייה בסרטון - בקרוב!", textAlign: TextAlign.right)));
+                },
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center, 
+                    children: [
+                      const Icon(Icons.ondemand_video, size: 28, color: Colors.black87), 
+                      const SizedBox(height: 2), 
+                      const Text("צפה", style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 14), SizedBox(width: 2), Text("+50", style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.bold))]),
+                    ]
+                  )
+                ),
+              ),
+            ),
+            SizedBox(height: height * 0.02),
+            
+            // --- כפתור שחק ---
+            Container(
+              width: double.infinity, height: height * 0.16,
+              decoration: BoxDecoration(gradient: LinearGradient(colors: _isNavigatingToGame ? [Colors.grey.shade600, Colors.grey.shade700] : [const Color(0xFFE040FB), const Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
+              child: InkWell(
+                onTap: () async {
+                   if (_isNavigatingToGame) return;
+                   if (coins < 50) {
+                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("אין לך מספיק מטבעות למשחק. (נדרש 50)", textAlign: TextAlign.right), backgroundColor: Colors.redAccent));
+                     return;
+                   }
+                   setState(() { _isNavigatingToGame = true; });
+                   await Navigator.push(
+                     context,
+                     MaterialPageRoute(
+                       builder: (context) => PreGameScreen(
+                         sessionTicket: widget.sessionTicket,
+                         roomId: "",
+                         myPlayFabId: widget.playFabId,
+                         myName: playfabUsername,
+                         myTrophies: trophies,
+                         opponentId: "",
+                         opponentName: "",
+                         opponentTrophies: 0,
+                         betAmount: 50,
+                         isRandomMatch: true,
+                       )
+                     )
+                   );
+                   if (mounted) setState(() { _isNavigatingToGame = false; });
+                },
+                child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Text("שחק", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
+                  const SizedBox(height: 2),
+                  Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 16), SizedBox(width: 3), Text("50", style: TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold))]),
+                ])),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
+ 
   Widget _buildFriendsButton(double height) {
     final size = height * 0.12;
     return Stack(
@@ -1385,12 +1427,6 @@ Widget _buildLeftMenu(double width, double height) {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: width * 0.35, height: height * 0.12,
-          decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.ondemand_video, size: 30), const SizedBox(width: 8), Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Text("קבל 50 מטבעות", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Text("נותרו 2 צפיות", style: TextStyle(fontSize: 12))])]),
         ),
       ],
     );
