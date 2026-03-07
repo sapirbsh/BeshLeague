@@ -60,6 +60,10 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   bool _hasRolledThisTurn = false;
   String? _floatingMessage;
 
+  // Highlight the last moved piece (source→dest)
+  int? _highlightFrom;
+  int? _highlightTo;
+
   final Random _random = Random();
 
   // --- מנוע המשחק (Backgammon Engine) ---
@@ -197,6 +201,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       _availableMoves.clear();
       _selectedPoint = null;
       _validDestinations.clear();
+      _highlightFrom = null;
+      _highlightTo = null;
     });
 
     _moveHistory.clear();
@@ -336,6 +342,15 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
     if (gameWon) {
       _endGame(winnerName: widget.opponentName);
+    } else {
+      // Flash highlight on moved piece so player can see it
+      setState(() {
+        _highlightFrom = (source == 25) ? null : source;
+        _highlightTo = (dest == 24) ? null : dest;
+      });
+      Future.delayed(const Duration(milliseconds: 900), () {
+        if (mounted) setState(() { _highlightFrom = null; _highlightTo = null; });
+      });
     }
   }
 
@@ -727,8 +742,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                     ),
                   ),
 
-                // כפתור "סיים תור" — מופיע רק בתור השחקן המקומי אחרי הטלה
-                if (_gameState == "playing" && _currentTurnId == widget.myPlayFabId && _hasRolledThisTurn)
+                // כפתור "סיים תור" — מופיע רק כשאין יותר מהלכים אפשריים
+                if (_gameState == "playing" && _currentTurnId == widget.myPlayFabId && _hasRolledThisTurn && (_availableMoves.isEmpty || !_hasAnyValidMove()))
                   Positioned(
                     bottom: height * 0.04,
                     right: width * 0.18 + 8,
@@ -971,6 +986,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     bool isMine = _board[index] > 0;
     bool isSelected = _selectedPoint == index;
     bool isTarget = _validDestinations.contains(index);
+    bool isHighlighted = (_highlightFrom == index || _highlightTo == index);
 
     Color triangleColor = (index % 2 == (isTop ? 0 : 1))
         ? const Color(0xFFE8DCC4)
@@ -981,8 +997,19 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         onTap: () => _handlePointTap(index),
         child: Container(
           decoration: BoxDecoration(
-            color: isTarget ? Colors.green.withOpacity(0.35) : Colors.transparent,
-            border: isTarget ? Border.all(color: Colors.greenAccent, width: 1.5) : null,
+            color: isTarget
+                ? Colors.green.withValues(alpha: 0.35)
+                : isHighlighted
+                    ? Colors.orange.withValues(alpha: 0.30)
+                    : Colors.transparent,
+            border: isTarget
+                ? Border.all(color: Colors.greenAccent, width: 1.5)
+                : isHighlighted
+                    ? Border.all(color: Colors.orangeAccent, width: 2.0)
+                    : null,
+            boxShadow: isHighlighted
+                ? [BoxShadow(color: Colors.orange.withValues(alpha: 0.6), blurRadius: 10, spreadRadius: 2)]
+                : null,
           ),
           child: CustomPaint(
             painter: TrianglePainter(triangleColor, isTop),
@@ -1044,57 +1071,76 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   Widget _buildDiceArea({double cs = 30}) {
     final double diceSize = (cs * 1.15).clamp(24.0, 40.0);
+    final double smallDice = (diceSize * 0.82).clamp(20.0, 34.0);
+
+    // Helper: build dice row for doubles (4 dice)
+    Widget buildDoublesDice(int val, int remaining, double sz) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        _buildDice(val, size: sz, consumed: remaining < 4),
+        const SizedBox(width: 3),
+        _buildDice(val, size: sz, consumed: remaining < 3),
+        const SizedBox(width: 3),
+        _buildDice(val, size: sz, consumed: remaining < 2),
+        const SizedBox(width: 3),
+        _buildDice(val, size: sz, consumed: remaining < 1),
+      ]);
+    }
+
+    // MY TURN
     if (_currentTurnId == widget.myPlayFabId) {
       if (!_hasRolledThisTurn) {
-        return ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.amber,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        // Gray placeholder dice + roll button
+        return Row(mainAxisSize: MainAxisSize.min, children: [
+          Opacity(opacity: 0.35, child: _buildDice(0, size: diceSize)),
+          const SizedBox(width: 5),
+          Opacity(opacity: 0.35, child: _buildDice(0, size: diceSize)),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _isRolling ? null : _rollPlayingDice,
+            child: _isRolling
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                : const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.casino, color: Colors.black, size: 16),
+                    SizedBox(width: 4),
+                    Text("זרוק", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                  ]),
           ),
-          onPressed: _isRolling ? null : _rollPlayingDice,
-          child: _isRolling
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-              : const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.casino, color: Colors.black, size: 18),
-                  SizedBox(width: 5),
-                  Text("זרוק", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
-                ]),
-        );
+        ]);
       } else {
-        if (_die1 == _die2 && _hasRolledThisTurn) {
+        if (_die1 == _die2) {
           final int remaining = _availableMoves.where((m) => m == _die1).length;
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildDice(_die1, size: diceSize, consumed: remaining <= 2),
-              const SizedBox(width: 8),
-              _buildDice(_die2, size: diceSize, consumed: remaining == 0),
-            ],
-          );
+          return buildDoublesDice(_die1, remaining, smallDice);
         }
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDice(_die1, size: diceSize, consumed: !_availableMoves.contains(_die1)),
-            const SizedBox(width: 8),
-            _buildDice(_die2, size: diceSize, consumed: !_availableMoves.contains(_die2)),
-          ],
-        );
+        return Row(mainAxisSize: MainAxisSize.min, children: [
+          _buildDice(_die1, size: diceSize, consumed: !_availableMoves.contains(_die1)),
+          const SizedBox(width: 8),
+          _buildDice(_die2, size: diceSize, consumed: !_availableMoves.contains(_die2)),
+        ]);
       }
     }
-    // Show opponent dice while rolling OR after rolling (so moves are visible to player)
-    if (_isRolling || (_hasRolledThisTurn && _currentTurnId == widget.opponentId)) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildDice(_die1, size: diceSize),
-          const SizedBox(width: 8),
-          _buildDice(_die2, size: diceSize),
-        ],
-      );
+
+    // OPPONENT TURN — always show dice (gray before roll, actual after)
+    if (!_hasRolledThisTurn && !_isRolling) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        Opacity(opacity: 0.35, child: _buildDice(0, size: diceSize)),
+        const SizedBox(width: 8),
+        Opacity(opacity: 0.35, child: _buildDice(0, size: diceSize)),
+      ]);
     }
-    return const SizedBox();
+    if (_die1 == _die2 && _hasRolledThisTurn) {
+      final int remaining = _availableMoves.where((m) => m == _die1).length;
+      return buildDoublesDice(_die1, remaining, smallDice);
+    }
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      _buildDice(_die1, size: diceSize, consumed: _hasRolledThisTurn && !_availableMoves.contains(_die1)),
+      const SizedBox(width: 8),
+      _buildDice(_die2, size: diceSize, consumed: _hasRolledThisTurn && !_availableMoves.contains(_die2)),
+    ]);
   }
 
   Widget _buildDicePips(int value, double size) {
