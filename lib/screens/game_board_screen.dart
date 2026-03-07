@@ -269,36 +269,48 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   }
 
   void _executeBotMovesSequentially() {
-    if (!mounted || _availableMoves.isEmpty || _gameState != "playing") {
-      _endTurn();
-      return;
-    }
+    if (!mounted || _gameState != "playing") return;
+    if (_availableMoves.isEmpty) { _endTurn(); return; }
+
     final move = BotService.selectBotMove(_board, List.from(_availableMoves), _oppBar, widget.botSkill!);
     if (move == null) { _endTurn(); return; }
 
     Future.delayed(const Duration(milliseconds: 600), () {
       if (!mounted || _gameState != "playing") return;
       _executeBotMove(move.source, move.dest);
-      Future.delayed(const Duration(milliseconds: 300), _executeBotMovesSequentially);
+      // Only continue if game is still in progress
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (_gameState == "playing") _executeBotMovesSequentially();
+      });
     });
   }
 
   void _executeBotMove(int source, int dest) {
-    setState(() {
-      final moveDistance = dest == 24 ? (23 - source + 1) : (dest - source);
+    bool gameWon = false;
 
+    setState(() {
       if (dest == 24) {
-        // Bear off
-        int exact = _availableMoves.firstWhere((m) => source + m > 23, orElse: () => -1);
-        if (exact != -1) _availableMoves.remove(exact);
+        // Bear off: prefer exact die, else smallest overshooting die
+        final neededDie = 24 - source;
+        int dieUsed = -1;
+        if (_availableMoves.contains(neededDie)) {
+          dieUsed = neededDie;
+        } else {
+          final overshooting = _availableMoves.where((m) => m > neededDie).toList()..sort();
+          if (overshooting.isNotEmpty) dieUsed = overshooting.first;
+        }
+        if (dieUsed != -1) _availableMoves.remove(dieUsed);
         _oppBorneOff++;
-        if (source == 25) { _oppBar--; } else { _board[source]++; } // board[source] is negative, increment toward 0
+        _board[source]++; // remove one bot piece (less negative, toward 0)
+        if (_oppBorneOff == 15) gameWon = true;
       } else {
-        _availableMoves.remove(moveDistance);
         if (source == 25) {
+          // Bar entry: die value = dest + 1 (since bot enters at index mv-1, so mv = dest+1)
+          _availableMoves.remove(dest + 1);
           _oppBar--;
         } else {
-          _board[source]++; // remove one bot piece (less negative)
+          _availableMoves.remove(dest - source);
+          _board[source]++; // remove one bot piece
         }
 
         if (_board[dest] == 1) {
@@ -306,14 +318,14 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           _board[dest] = -1;
           _myBar++;
         } else {
-          _board[dest]--; // add bot piece (more negative)
+          _board[dest]--; // add bot piece
         }
       }
-
-      if (_oppBorneOff == 15) {
-        _endGame(winnerName: widget.opponentName);
-      }
     });
+
+    if (gameWon) {
+      _endGame(winnerName: widget.opponentName);
+    }
   }
 
   void _rollPlayingDice() {
@@ -451,19 +463,25 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       'myBorneOff': _myBorneOff,
       'availableMoves': List<int>.from(_availableMoves),
     });
+
+    bool gameWon = false;
+    bool turnEnded = false;
+
     setState(() {
       int source = _selectedPoint!;
       int moveDistance = source - dest;
 
       if (dest == -1) {
-        int exact = _availableMoves.firstWhere((m) => source - m == -1, orElse: () => -1);
-        if (exact != -1) {
-          _availableMoves.remove(exact);
+        // Bear off: prefer exact die, else smallest overshooting die
+        final neededDie = source + 1;
+        int dieUsed = -1;
+        if (_availableMoves.contains(neededDie)) {
+          dieUsed = neededDie;
         } else {
-          List<int> largerMoves = _availableMoves.where((m) => m > source + 1).toList();
-          largerMoves.sort();
-          _availableMoves.remove(largerMoves.first);
+          final overshooting = _availableMoves.where((m) => m > neededDie).toList()..sort();
+          if (overshooting.isNotEmpty) dieUsed = overshooting.first;
         }
+        if (dieUsed != -1) _availableMoves.remove(dieUsed);
         _myBorneOff++;
         _board[source]--;
       } else {
@@ -474,7 +492,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           _board[source]--;
         }
 
-        if (_board[dest] == -1) { 
+        if (_board[dest] == -1) {
           _board[dest] = 1;
           _oppBar++;
         } else {
@@ -486,14 +504,17 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       _validDestinations.clear();
 
       if (_myBorneOff == 15) {
-        _endGame(winnerName: widget.myName);
-        return;
-      }
-
-      if (_availableMoves.isEmpty || !_hasAnyValidMove()) {
-        _endTurn();
+        gameWon = true;
+      } else if (_availableMoves.isEmpty || !_hasAnyValidMove()) {
+        turnEnded = true;
       }
     });
+
+    if (gameWon) {
+      _endGame(winnerName: widget.myName);
+    } else if (turnEnded) {
+      _endTurn();
+    }
   }
 
   void _handlePointTap(int index) {

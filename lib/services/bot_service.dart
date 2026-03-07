@@ -99,10 +99,10 @@ class BotService {
     Set<int> uniqueMoves = availableMoves.toSet();
 
     if (oppBar > 0) {
-      // Must enter from bar — entry point is 0+move-1 (0-indexed from point 0)
+      // Must enter from bar — bot enters at index (mv-1) from the human's home end
       for (int mv in uniqueMoves) {
-        int dest = mv - 1; // entering from bar into index (mv-1) since bar is at "point 25" in backgammon notation → 0-indexed board dest = mv - 1
-        if (dest >= 0 && dest <= 23 && board[dest] >= -1) {
+        int dest = mv - 1;
+        if (dest >= 0 && dest <= 23 && board[dest] <= 1) {
           moves.add(BotMove(25, dest));
         }
       }
@@ -125,12 +125,12 @@ class BotService {
           if (dest == 24) {
             moves.add(BotMove(src, 24));
           } else {
-            // Overshoot: only valid if no bot pieces at higher indices
-            bool pieceBehind = false;
-            for (int i = src - 1; i >= 18; i--) {
-              if (board[i] < 0) { pieceBehind = true; break; }
+            // Overshoot: only valid if no bot pieces on higher-index points in home board
+            bool pieceOnHigher = false;
+            for (int i = src + 1; i <= 23; i++) {
+              if (board[i] < 0) { pieceOnHigher = true; break; }
             }
-            if (!pieceBehind) moves.add(BotMove(src, 24));
+            if (!pieceOnHigher) moves.add(BotMove(src, 24));
           }
         }
       }
