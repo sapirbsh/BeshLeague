@@ -30,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int xp = 0;
   int dailyGamesPlayed = 0;
   int streakDays = 0;
+  String _lastStreakDate = '';
   String lastLogin = "טוען...";
   int leaguesPlayed = 0; 
   int totalWins = 0;
@@ -184,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final userDataRes = await http.post(
         Uri.parse('https://$titleId.playfabapi.com/Client/GetUserData'), 
         headers: headers, 
-        body: json.encode({"Keys": ["FriendRequests", "DuelRequests", "DuelStatus", "CurrentLogin", "PreviousLogin", "TotalXP", "DailyGamesPlayed", "StreakDays"]})
+        body: json.encode({"Keys": ["FriendRequests", "DuelRequests", "DuelStatus", "CurrentLogin", "PreviousLogin", "TotalXP", "DailyGamesPlayed", "StreakDays", "LastStreakDate", "Wins", "Losses"]})
       );
       
       List<dynamic> fetchedRequests = [];
@@ -194,6 +195,9 @@ class _HomeScreenState extends State<HomeScreen> {
       String savedPreviousLogin = "";
       int fetchedXp = 0;
       int fetchedStreakDays = 0;
+      String fetchedLastStreakDate = '';
+      int fetchedWins = 0;
+      int fetchedLosses = 0;
 
       if (userDataRes.statusCode == 200) {
         final userData = json.decode(userDataRes.body)['data']?['Data'];
@@ -206,6 +210,9 @@ class _HomeScreenState extends State<HomeScreen> {
           if (userData['PreviousLogin'] != null) savedPreviousLogin = userData['PreviousLogin']['Value'];
           fetchedXp = int.tryParse(userData['TotalXP']?['Value'] ?? '0') ?? 0;
           fetchedStreakDays = int.tryParse(userData['StreakDays']?['Value'] ?? '0') ?? 0;
+          fetchedLastStreakDate = userData['LastStreakDate']?['Value'] ?? '';
+          fetchedWins = int.tryParse(userData['Wins']?['Value'] ?? '0') ?? 0;
+          fetchedLosses = int.tryParse(userData['Losses']?['Value'] ?? '0') ?? 0;
           final fetchedDailyGames = int.tryParse(userData['DailyGamesPlayed']?['Value'] ?? '0') ?? 0;
           final lastGameDateStr = userData['LastGameDate']?['Value'] ?? '';
           final today = DateTime.now().toUtc().toIso8601String().substring(0, 10);
@@ -293,6 +300,9 @@ class _HomeScreenState extends State<HomeScreen> {
             coins = fetchedCoins;
             xp = fetchedXp;
             streakDays = fetchedStreakDays;
+            _lastStreakDate = fetchedLastStreakDate;
+            totalWins = fetchedWins;
+            totalLosses = fetchedLosses;
             lastLogin = displayLoginStr;
             friendsList = fetchedFriends;
             friendRequests = fetchedRequests;
@@ -912,10 +922,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTableCell(String text, bool isHeader) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 6.0), child: Center(child: Text(text, style: TextStyle(fontSize: isHeader ? 12 : 16, fontWeight: FontWeight.bold, color: Colors.black))));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -982,6 +988,162 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showDailyGiftDialog() {
+    final today = DateTime.now().toUtc().toIso8601String().substring(0, 10);
+    final alreadyClaimed = _lastStreakDate == today;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final size = MediaQuery.of(ctx).size;
+        final displayStreak = alreadyClaimed ? streakDays : (streakDays == 0 ? 1 : streakDays);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: size.width * 0.55,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.amber, width: 2),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 26),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ),
+                    const Text("מתנת כניסה יומית", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.amber)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildStreakDay(1, 50, displayStreak),
+                    _buildStreakDay(2, 100, displayStreak),
+                    _buildStreakDay(3, 150, displayStreak),
+                    _buildStreakDay(4, 200, displayStreak),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text("יום 4+ = 200 מטבעות בכל יום", style: TextStyle(fontSize: 11, color: Colors.white54)),
+                const SizedBox(height: 16),
+                if (alreadyClaimed)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(20)),
+                    child: const Text("כבר קיבלת מתנה היום ✓", style: TextStyle(fontSize: 16, color: Colors.greenAccent)),
+                  )
+                else
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _claimDailyGift();
+                    },
+                    child: const Text("קבל מתנה!", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStreakDay(int day, int reward, int currentStreak) {
+    final isActive = currentStreak >= day;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: isActive ? Colors.amber : Colors.white12,
+            shape: BoxShape.circle,
+            border: Border.all(color: isActive ? Colors.orange : Colors.white24, width: 2),
+          ),
+          child: Center(
+            child: Icon(Icons.card_giftcard, color: isActive ? Colors.black : Colors.white38, size: 26),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text("יום $day", style: TextStyle(fontSize: 11, color: isActive ? Colors.amber : Colors.white54)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.monetization_on, size: 11, color: isActive ? Colors.amber : Colors.white38),
+            const SizedBox(width: 2),
+            Text("$reward", style: TextStyle(fontSize: 11, color: isActive ? Colors.white : Colors.white38, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _claimDailyGift() async {
+    final today = DateTime.now().toUtc().toIso8601String().substring(0, 10);
+    if (_lastStreakDate == today) return;
+
+    final yesterday = DateTime.now().toUtc().subtract(const Duration(days: 1)).toIso8601String().substring(0, 10);
+    int newStreak;
+    if (_lastStreakDate == yesterday) {
+      newStreak = streakDays + 1;
+    } else {
+      newStreak = 1;
+    }
+    final reward = newStreak >= 4 ? 200 : newStreak * 50;
+
+    setState(() {
+      streakDays = newStreak;
+      _lastStreakDate = today;
+      coins += reward;
+    });
+
+    const titleId = "1A15A2";
+    final headers = {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket};
+    try {
+      await http.post(
+        Uri.parse('https://$titleId.playfabapi.com/Client/AddUserVirtualCurrency'),
+        headers: headers,
+        body: json.encode({"VirtualCurrency": "CO", "Amount": reward}),
+      );
+      await http.post(
+        Uri.parse('https://$titleId.playfabapi.com/Client/UpdateUserData'),
+        headers: headers,
+        body: json.encode({
+          "Data": {
+            "StreakDays": "$newStreak",
+            "LastStreakDate": today,
+          }
+        }),
+      );
+    } catch (_) {}
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("קיבלת $reward מטבעות! רצף: $newStreak ימים 🎁", textAlign: TextAlign.right),
+          backgroundColor: Colors.amber[800],
+        ),
+      );
+    }
+  }
+
   Widget _buildTopBar(double width, double height, EdgeInsets safePadding) {
     final barH = (height * 0.09).clamp(36.0, 60.0);
     final fs = (height * 0.036).clamp(10.0, 15.0);
@@ -1001,7 +1163,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(icon: Icon(Icons.settings, color: Colors.white, size: iconSz), onPressed: _showSettingsMenu, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           IconButton(
             icon: Icon(Icons.calendar_today, color: Colors.white, size: iconSz),
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("כניסה יומית - בקרוב!", textAlign: TextAlign.right))),
+            onPressed: _showDailyGiftDialog,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -1174,35 +1336,74 @@ Widget _buildLeftMenu(double width, double height) {
   }
 
   Widget _buildCenterProfile(double width, double height) {
+    final avatarR = height * 0.09;
     return Column(
-      mainAxisSize: MainAxisSize.min, // קריטי כדי שהפרופיל לא יימתח על כל המסך
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: double.infinity, height: height * 0.55, decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(15)), padding: const EdgeInsets.all(12),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A2E).withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white24, width: 1.5),
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              // Profile picture
+              Container(
+                width: avatarR * 2,
+                height: avatarR * 2,
+                decoration: BoxDecoration(
+                  color: Colors.grey[700],
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.amber, width: 2.5),
+                ),
+                child: Icon(Icons.person, size: avatarR * 1.1, color: Colors.grey[300]),
+              ),
+              const SizedBox(height: 6),
+              // Username
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(playfabUsername, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+              const SizedBox(height: 10),
+              // XP bar
+              _buildXpBar(),
+              const SizedBox(height: 12),
+              // Wins / Losses / Trophies row
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Stack(clipBehavior: Clip.none, children: [Container(width: height * 0.16, height: height * 0.16, decoration: BoxDecoration(color: Colors.grey[400], border: Border.all(color: Colors.white, width: 3)), child: Icon(Icons.person, size: height * 0.1, color: Colors.grey[600])), Positioned(bottom: -5, right: -10, child: Row(children: const [Icon(Icons.favorite, color: Colors.blueAccent, size: 16), Icon(Icons.favorite, color: Colors.purple, size: 24)]))]),
-                  const SizedBox(width: 15),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [FittedBox(fit: BoxFit.scaleDown, child: Text(playfabUsername, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black))), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text("התחברות אחרונה - $lastLogin", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))), const SizedBox(height: 8), FittedBox(fit: BoxFit.scaleDown, child: Text("השתתפות בליגות: $leaguesPlayed", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)))])),
+                  _buildStatBadge(Icons.emoji_events_outlined, "$totalWins", "נצחונות", Colors.greenAccent),
+                  Container(width: 1, height: 40, color: Colors.white24),
+                  _buildStatBadge(Icons.close, "$totalLosses", "הפסדים", Colors.redAccent),
+                  Container(width: 1, height: 40, color: Colors.white24),
+                  _buildStatBadge(Icons.emoji_events, "$trophies", "גביעים", Colors.amber),
                 ],
               ),
-              const Spacer(),
-              Container(width: width * 0.25, color: Colors.white, child: Table(border: TableBorder.all(color: Colors.black, width: 2), children: [TableRow(children: [_buildTableCell("נצחונות", true), _buildTableCell("הפסדים", true)]), TableRow(children: [_buildTableCell("$totalWins", false), _buildTableCell("$totalLosses", false)])])),
-              const Spacer(),
-              Directionality(textDirection: TextDirection.ltr, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.emoji_events, color: Colors.amber, size: 35), const SizedBox(width: 10), Text("X  $trophies", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black))])),
             ],
           ),
         ),
         const SizedBox(height: 6),
-        _buildXpBar(),
-        const SizedBox(height: 6),
         Container(
-          width: width * 0.35, height: height * 0.12, decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
+          width: width * 0.35, height: height * 0.12,
+          decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.ondemand_video, size: 30), const SizedBox(width: 8), Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Text("קבל 50 מטבעות", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), Text("נותרו 2 צפיות", style: TextStyle(fontSize: 12))])]),
         ),
+      ],
+    );
+  }
+
+  Widget _buildStatBadge(IconData icon, String value, String label, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.white54)),
       ],
     );
   }
