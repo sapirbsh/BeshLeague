@@ -39,8 +39,7 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
     );
   }
-
-  Future<void> _loginUser() async {
+Future<void> _loginUser() async {
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text;
 
@@ -68,6 +67,7 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     try {
+      // 1. בקשת התחברות לשרת
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -75,23 +75,55 @@ class _AuthScreenState extends State<AuthScreen> {
       );
 
       final responseData = json.decode(response.body);
-      setState(() { _isLoading = false; });
 
       if (response.statusCode == 200) {
         final sessionTicket = responseData['data']['SessionTicket'];
         final playFabId = responseData['data']['PlayFabId'];
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(
-              sessionTicket: sessionTicket, 
-              playFabId: playFabId,
+        // 2. --- בדיקת חסימה (Ban) ---
+        try {
+          final banCheckUrl = Uri.parse('https://$titleId.playfabapi.com/Client/GetUserReadOnlyData');
+          final banCheckRes = await http.post(
+            banCheckUrl,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Authorization': sessionTicket, // משתמשים בכרטיס הזמני של השחקן כדי לבדוק אותו
+            },
+            body: json.encode({"Keys": ["isBanned"]}),
+          );
+
+          if (banCheckRes.statusCode == 200) {
+            final roData = json.decode(banCheckRes.body)['data']['Data'];
+            if (roData != null && roData['isBanned'] != null && roData['isBanned']['Value'] == 'true') {
+              // השחקן חסום! זורקים אותו החוצה.
+              setState(() { _isLoading = false; });
+              _showErrorDialog("החשבון שלך נחסם מהמשחק.\nאנא פנה לתמיכה לקבלת עזרה.");
+              return; // עוצרים הכל ולא ממשיכים למסך הבית!
+            }
+          }
+        } catch (e) {
+          debugPrint("שגיאה בבדיקת חסימה: $e");
+        }
+        // -----------------------------
+
+        setState(() { _isLoading = false; });
+
+        // 3. אם הכל תקין והוא לא חסום, מכניסים אותו למסך הבית
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                sessionTicket: sessionTicket, 
+                playFabId: playFabId,
+              ),
             ),
-          ),
-          (Route<dynamic> route) => false,
-        );
+            (Route<dynamic> route) => false,
+          );
+        }
+
       } else {
+        setState(() { _isLoading = false; });
         String errorMsg = responseData['errorMessage'] ?? "שגיאה לא ידועה.";
         if (errorMsg.contains("User not found")) {
           _showErrorDialog("משתמש לא נמצא. ודא שהקלדת נכון או הירשם.");
@@ -106,7 +138,7 @@ class _AuthScreenState extends State<AuthScreen> {
       _showErrorDialog("שגיאת תקשורת. בדוק את החיבור לאינטרנט.");
     }
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -586,36 +586,55 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     });
     _awardXPAndCoins(iWon: iWon);
   }
-
-  Future<void> _awardXPAndCoins({required bool iWon}) async {
+Future<void> _awardXPAndCoins({required bool iWon}) async {
     if (widget.sessionTicket.isEmpty) {
       if (mounted) setState(() { _showWinScreen = true; });
       return;
     }
+
     try {
+      // 1. משיכת הנתונים הנוכחיים של השחקן מהשרת (כולל נצחונות והפסדים!)
       final res = await http.post(
         Uri.parse('https://1A15A2.playfabapi.com/Client/GetUserData'),
         headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-        body: json.encode({"Keys": ["TotalXP", "DailyGamesPlayed", "LastGameDate"]}),
+        body: json.encode({"Keys": ["TotalXP", "DailyGamesPlayed", "LastGameDate", "Wins", "Losses"]}),
       );
+
       int totalXp = 0;
       int dailyGames = 0;
+      int wins = 0;
+      int losses = 0;
       String lastGameDate = '';
+
       if (res.statusCode == 200) {
         final data = json.decode(res.body)['data']?['Data'];
         totalXp = int.tryParse(data?['TotalXP']?['Value'] ?? '0') ?? 0;
         dailyGames = int.tryParse(data?['DailyGamesPlayed']?['Value'] ?? '0') ?? 0;
+        wins = int.tryParse(data?['Wins']?['Value'] ?? '0') ?? 0;
+        losses = int.tryParse(data?['Losses']?['Value'] ?? '0') ?? 0;
         lastGameDate = data?['LastGameDate']?['Value'] ?? '';
       }
+
+      // 2. חישוב הנתונים החדשים
       final today = DateTime.now().toUtc().toIso8601String().substring(0, 10);
       if (lastGameDate != today) dailyGames = 0;
+      
       final isBoost = dailyGames < 5;
       final xpEarned = isBoost ? 50 : 25;
       final newTotalXP = totalXp + xpEarned;
       final newDailyGames = isBoost ? dailyGames + 1 : dailyGames;
+      
       final levelBefore = _levelFromTotalXP(totalXp);
       final levelAfter = _levelFromTotalXP(newTotalXP);
 
+      // עדכון נצחונות או הפסדים
+      if (iWon) {
+        wins++;
+      } else {
+        losses++;
+      }
+
+      // 3. שמירת הנתונים האישיים המעודכנים בחזרה לשרת (UserData)
       await http.post(
         Uri.parse('https://1A15A2.playfabapi.com/Client/UpdateUserData'),
         headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
@@ -623,8 +642,26 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           "TotalXP": newTotalXP.toString(),
           "DailyGamesPlayed": newDailyGames.toString(),
           "LastGameDate": today,
+          "Wins": wins.toString(),
+          "Losses": losses.toString(),
         }}),
       );
+
+      // 4. שליחת ה-XP לטבלת השיאנים המרכזית (Leaderboard)!
+      await http.post(
+        Uri.parse('https://1A15A2.playfabapi.com/Client/UpdatePlayerStatistics'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({
+          "Statistics": [
+            {
+              "StatisticName": "TotalXP",
+              "Value": newTotalXP
+            }
+          ]
+        }),
+      );
+
+      // 5. הענקת מטבעות אם השחקן ניצח
       if (iWon) {
         await http.post(
           Uri.parse('https://1A15A2.playfabapi.com/Client/AddUserVirtualCurrency'),
@@ -632,6 +669,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           body: json.encode({"VirtualCurrency": "CO", "Amount": widget.betAmount * 2}),
         );
       }
+
+      // 6. הצגת מסך הניצחון/הפסד
       if (mounted) {
         setState(() {
           _xpEarned = xpEarned;
@@ -642,11 +681,12 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           _showWinScreen = true;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint("Error in _awardXPAndCoins: $e");
+      // אם יש שגיאת אינטרנט, לפחות נראה לשחקן את מסך הסיום כדי שלא ייתקע
       if (mounted) setState(() { _showWinScreen = true; });
     }
   }
-
   void _confirmExitDialog() {
     showDialog(
       context: context,
