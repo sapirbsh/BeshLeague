@@ -8,10 +8,10 @@ import 'package:http/http.dart' as http;
 // ─── Prize Model ─────────────────────────────────────────────────────────────
 
 class _Prize {
-  final String label;      // text shown on wheel
+  final String label;
   final int coins;
   final int tickets;
-  final int weight;        // out of 100
+  final int weight;
   final Color color;
 
   const _Prize({
@@ -26,6 +26,8 @@ class _Prize {
     if (coins > 0) return '$coins מטבעות';
     return '$tickets פתק${tickets > 1 ? 'ים' : ''}';
   }
+
+  String get emoji => tickets > 0 ? '🎟️' : '🪙';
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -63,14 +65,15 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
 
   bool _isSpinning     = false;
   bool _isLoading      = true;
-  int  _spinsAvailable = 0;   // spins in bank (watch ad to earn, spend to spin)
-  int  _adsWatched     = 0;   // total ads watched today (cap = _maxDailySpins)
+  int  _spinsAvailable = 0;
+  int  _adsWatched     = 0;
   String _monthlyWinner = '';
-  int  _selectedIndex = 0;
+  int  _selectedIndex  = 0;
+  _Prize? _wonPrize;
 
   // Glow animation for spin button
   late AnimationController _glowController;
-  late Animation<double> _glowAnim;
+  late Animation<double>   _glowAnim;
 
   bool get _canEarnMore => _adsWatched < _maxDailySpins;
 
@@ -81,7 +84,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _glowAnim = Tween<double>(begin: 0.6, end: 1.0).animate(
+    _glowAnim = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
     _loadData();
@@ -94,7 +97,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     super.dispose();
   }
 
-  // ─── Weighted random ───────────────────────────────────────────────────────
+  // ─── Weighted random ────────────────────────────────────────────────────────
 
   int _weightedRandom() {
     final r = Random().nextInt(100);
@@ -106,7 +109,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     return 0;
   }
 
-  // ─── PlayFab data load ────────────────────────────────────────────────────
+  // ─── PlayFab ────────────────────────────────────────────────────────────────
 
   Future<void> _loadData() async {
     if (!mounted) return;
@@ -120,7 +123,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
         http.post(
           Uri.parse('https://$_titleId.playfabapi.com/Client/GetUserData'),
           headers: headers,
-          body: json.encode({"Keys": ["LastSpinDate", "SpinsToday"]}),
+          body: json.encode({"Keys": ["LastSpinDate", "AdsWatched", "SpinsAvailable"]}),
         ),
         http.post(
           Uri.parse('https://$_titleId.playfabapi.com/Client/GetTitleData'),
@@ -136,20 +139,16 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
 
       final today    = _todayUtc();
       final lastDate = userData?['LastSpinDate']?['Value'] ?? '';
-      // Reset on new day
       int adsWatched     = lastDate == today ? (int.tryParse(userData?['AdsWatched']?['Value']     ?? '0') ?? 0) : 0;
       int spinsAvailable = lastDate == today ? (int.tryParse(userData?['SpinsAvailable']?['Value'] ?? '0') ?? 0) : 0;
 
-      // Monthly winner can be a JSON object or plain string
       String winner = '';
       final rawWinner = titleData?['MonthlyWinner'] ?? '';
       if (rawWinner.isNotEmpty) {
         try {
           final parsed = json.decode(rawWinner);
           winner = parsed is Map ? (parsed['username'] ?? '') : rawWinner;
-        } catch (_) {
-          winner = rawWinner;
-        }
+        } catch (_) { winner = rawWinner; }
       }
 
       setState(() {
@@ -163,7 +162,42 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     }
   }
 
-  // ─── Spin logic ───────────────────────────────────────────────────────────
+  Future<void> _saveSpinData(String date, int adsWatched, int spinsAvailable) async {
+    if (widget.sessionTicket.isEmpty) return;
+    try {
+      await http.post(
+        Uri.parse('https://$_titleId.playfabapi.com/Client/UpdateUserData'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({"Data": {
+          "LastSpinDate":   date,
+          "AdsWatched":     "$adsWatched",
+          "SpinsAvailable": "$spinsAvailable",
+        }}),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _awardPrize(_Prize prize) async {
+    if (widget.sessionTicket.isEmpty) return;
+    try {
+      if (prize.coins > 0) {
+        await http.post(
+          Uri.parse('https://$_titleId.playfabapi.com/Client/AddUserVirtualCurrency'),
+          headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+          body: json.encode({"VirtualCurrency": "CO", "Amount": prize.coins}),
+        );
+      }
+      if (prize.tickets > 0) {
+        await http.post(
+          Uri.parse('https://$_titleId.playfabapi.com/Client/AddUserVirtualCurrency'),
+          headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+          body: json.encode({"VirtualCurrency": "TK", "Amount": prize.tickets}),
+        );
+      }
+    } catch (_) {}
+  }
+
+  // ─── Spin logic ─────────────────────────────────────────────────────────────
 
   void _spin() {
     if (_isSpinning || _spinsAvailable <= 0) return;
@@ -171,75 +205,30 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     setState(() {
       _isSpinning    = true;
       _selectedIndex = result;
+      _wonPrize      = null;
     });
     _wheelController.add(result);
   }
 
-  Future<void> _onAnimationEnd() async {
-    final prize = _prizes[_selectedIndex];
-    final today = _todayUtc();
-    final newAvailable = _spinsAvailable - 1;
+  void _onAnimationEnd() {
+    final prize    = _prizes[_selectedIndex];
+    final today    = _todayUtc();
+    final newAvail = _spinsAvailable - 1;
 
-    // Fire-and-forget PlayFab calls
     _awardPrize(prize);
-    _saveSpinData(today, _adsWatched, newAvailable);
+    _saveSpinData(today, _adsWatched, newAvail);
 
     if (!mounted) return;
     setState(() {
       _isSpinning     = false;
-      _spinsAvailable = newAvailable;
+      _spinsAvailable = newAvail;
+      _wonPrize       = prize;
     });
-    _showPrizeDialog(prize);
-  }
-
-  Future<void> _awardPrize(_Prize prize) async {
-    if (widget.sessionTicket.isEmpty) return;
-    final headers = {
-      'Content-Type': 'application/json',
-      'X-Authorization': widget.sessionTicket,
-    };
-    try {
-      if (prize.coins > 0) {
-        await http.post(
-          Uri.parse('https://$_titleId.playfabapi.com/Client/AddUserVirtualCurrency'),
-          headers: headers,
-          body: json.encode({"VirtualCurrency": "CO", "Amount": prize.coins}),
-        );
-      }
-      if (prize.tickets > 0) {
-        await http.post(
-          Uri.parse('https://$_titleId.playfabapi.com/Client/AddUserVirtualCurrency'),
-          headers: headers,
-          body: json.encode({"VirtualCurrency": "TK", "Amount": prize.tickets}),
-        );
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _saveSpinData(String date, int adsWatched, int spinsAvailable) async {
-    if (widget.sessionTicket.isEmpty) return;
-    try {
-      await http.post(
-        Uri.parse('https://$_titleId.playfabapi.com/Client/UpdateUserData'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Authorization': widget.sessionTicket,
-        },
-        body: json.encode({
-          "Data": {
-            "LastSpinDate":    date,
-            "AdsWatched":      "$adsWatched",
-            "SpinsAvailable":  "$spinsAvailable",
-          }
-        }),
-      );
-    } catch (_) {}
   }
 
   void _watchAdForSpin() {
     if (!_canEarnMore || _isSpinning) return;
-    // TODO: Integrate AdMob / Unity Ads here; call _onAdCompleted() on success
-    // Simulating ad completion for now:
+    // TODO: replace with real AdMob call; on ad completion call _onAdCompleted()
     _onAdCompleted();
   }
 
@@ -255,174 +244,9 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     _saveSpinData(today, newAds, newAvailable);
   }
 
-  // ─── Dialogs ──────────────────────────────────────────────────────────────
+  String _todayUtc() => DateTime.now().toUtc().toIso8601String().substring(0, 10);
 
-  void _showPrizeDialog(_Prize prize) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Text(
-                prize.tickets > 0 ? '🎟️' : '🪙',
-                style: const TextStyle(fontSize: 64),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'מזל טוב! זכית ב:',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                decoration: BoxDecoration(
-                  color: prize.color.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: prize.color, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: prize.color.withValues(alpha: 0.35),
-                      blurRadius: 16,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Text(
-                  prize.displayName,
-                  style: TextStyle(
-                    color: prize.color,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: prize.color,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'כיף!',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showOddsDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.blueAccent, size: 22),
-              SizedBox(width: 10),
-              Text(
-                'טבלת הסיכויים',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Divider(color: Colors.white12),
-              const SizedBox(height: 6),
-              for (final prize in _prizes) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: prize.color.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${prize.weight}%',
-                          style: TextStyle(
-                            color: prize.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          prize.displayName,
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                        ),
-                      ),
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: prize.color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 10),
-              const Divider(color: Colors.white12),
-              const SizedBox(height: 6),
-              const Text(
-                'הגלגל מגריל את התוצאה לפני האנימציה.\nכל סיבוב עצמאי לחלוטין.',
-                style: TextStyle(color: Colors.white38, fontSize: 11),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('הבנתי', style: TextStyle(color: Colors.blueAccent, fontSize: 16)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-
-  String _todayUtc() =>
-      DateTime.now().toUtc().toIso8601String().substring(0, 10);
-
-  // ─── Build ────────────────────────────────────────────────────────────────
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -431,6 +255,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
         textDirection: TextDirection.rtl,
         child: Stack(
           children: [
+            // Background
             Image.asset(
               'assets/background_dark.png',
               fit: BoxFit.cover,
@@ -438,20 +263,15 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
               height: double.infinity,
               errorBuilder: (ctx, err, st) => Container(color: const Color(0xFF0A192F)),
             ),
-            Container(color: Colors.black.withValues(alpha: 0.5)),
+            Container(color: Colors.black.withValues(alpha: 0.45)),
             SafeArea(
               child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.amber),
-                    )
-                  : Stack(
+                  ? const Center(child: CircularProgressIndicator(color: Colors.amber))
+                  : Column(
                       children: [
-                        // Wheel fills entire area
-                        Positioned.fill(child: _buildWheel()),
-                        // Header overlaid on top
-                        Positioned(top: 0, left: 0, right: 0, child: _buildHeader()),
-                        // Controls overlaid at bottom
-                        Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomSection()),
+                        _buildHeader(),
+                        Expanded(child: _buildWheelSection()),
+                        _buildControls(),
                       ],
                     ),
             ),
@@ -461,11 +281,11 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     );
   }
 
-  // ─── Header ───────────────────────────────────────────────────────────────
+  // ─── Header ─────────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
       child: Row(
         children: [
           GestureDetector(
@@ -474,159 +294,177 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white10,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.white24),
               ),
-              child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+              child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
+                  shaderCallback: (b) => const LinearGradient(
                     colors: [Color(0xFFFFD700), Color(0xFFFF8C00), Color(0xFFFFD700)],
-                  ).createShader(bounds),
-                  child: const Text(
-                    '🎰 הגרלת 100 ש״ח!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  ).createShader(b),
+                  child: const Text('🎰 גלגל המזל',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                 ),
-                const Text(
-                  'כל פתק הגרלה מגדיל את הסיכוי שלך לזכות',
-                  style: TextStyle(color: Colors.white60, fontSize: 12),
-                ),
-                if (_monthlyWinner.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.emoji_events, color: Colors.amber, size: 13),
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          'זוכה חודש שעבר: $_monthlyWinner',
-                          style: const TextStyle(
-                            color: Colors.greenAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                if (_monthlyWinner.isNotEmpty)
+                  Row(children: [
+                    const Icon(Icons.emoji_events, color: Colors.amber, size: 12),
+                    const SizedBox(width: 4),
+                    Flexible(child: Text('זוכה חודש שעבר: $_monthlyWinner',
+                        style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
+                        overflow: TextOverflow.ellipsis)),
+                  ]),
               ],
             ),
           ),
           IconButton(
             onPressed: _showOddsDialog,
-            icon: const Icon(Icons.info_outline, color: Colors.white54, size: 26),
-            tooltip: 'טבלת סיכויים',
+            icon: const Icon(Icons.info_outline, color: Colors.white54, size: 24),
           ),
         ],
       ),
     );
   }
 
-  // ─── Fortune Wheel ────────────────────────────────────────────────────────
+  // ─── Wheel + prize overlay ───────────────────────────────────────────────────
 
-  Widget _buildWheel() {
+  Widget _buildWheelSection() {
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        // Leave room for header (~80px) and bottom controls (~130px)
-        final availableH = constraints.maxHeight - 210;
-        final size = min(constraints.maxWidth - 16, availableH.clamp(100.0, constraints.maxHeight)).toDouble();
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 80, bottom: 130),
-            child: SizedBox(
-            width: size,
-            height: size,
-            child: FortuneWheel(
-              selected: _wheelController.stream,
-              animateFirst: false,
-              duration: const Duration(seconds: 5),
-              onAnimationEnd: _onAnimationEnd,
-              indicators: const [
-                FortuneIndicator(
-                  alignment: Alignment.topCenter,
-                  child: TriangleIndicator(
-                    color: Colors.white,
-                    width: 22,
-                    height: 28,
-                  ),
-                ),
-              ],
-              items: [
-                for (final prize in _prizes)
-                  FortuneItem(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(
-                        prize.label,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          height: 1.2,
+        final size = min(constraints.maxWidth, constraints.maxHeight) * 0.95;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // The big fortune wheel
+            Center(
+              child: SizedBox(
+                width: size,
+                height: size,
+                child: FortuneWheel(
+                  selected: _wheelController.stream,
+                  animateFirst: false,
+                  duration: const Duration(seconds: 5),
+                  onAnimationEnd: _onAnimationEnd,
+                  indicators: const [
+                    FortuneIndicator(
+                      alignment: Alignment.topCenter,
+                      child: TriangleIndicator(color: Colors.white, width: 26, height: 32),
+                    ),
+                  ],
+                  items: [
+                    for (final prize in _prizes)
+                      FortuneItem(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: Text(
+                            prize.label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              height: 1.3,
+                            ),
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.rtl,
+                          ),
                         ),
-                        textAlign: TextAlign.center,
-                        textDirection: TextDirection.rtl,
+                        style: FortuneItemStyle(
+                          color: prize.color,
+                          borderColor: Colors.white,
+                          borderWidth: 2.5,
+                        ),
                       ),
-                    ),
-                    style: FortuneItemStyle(
-                      color: prize.color,
-                      borderColor: Colors.white,
-                      borderWidth: 2,
-                    ),
-                  ),
-              ],
+                  ],
+                ),
+              ),
             ),
-            ),
-          ),
+            // Prize pop-up overlay (shown after spin)
+            if (_wonPrize != null && !_isSpinning)
+              Positioned(
+                bottom: size * 0.05,
+                child: _buildPrizeOverlay(_wonPrize!),
+              ),
+          ],
         );
       },
     );
   }
 
-  // ─── Bottom Controls ──────────────────────────────────────────────────────
+  Widget _buildPrizeOverlay(_Prize prize) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.5, end: 1.0),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.elasticOut,
+      builder: (ctx, scale, child) => Transform.scale(scale: scale, child: child),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+        decoration: BoxDecoration(
+          color: prize.color.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white, width: 2.5),
+          boxShadow: [
+            BoxShadow(color: prize.color.withValues(alpha: 0.6), blurRadius: 24, spreadRadius: 4),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(prize.emoji, style: const TextStyle(fontSize: 40)),
+            const SizedBox(height: 6),
+            Text('🎉 מזל טוב! זכית ב:', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text(prize.displayName,
+                style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () => setState(() => _wonPrize = null),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: prize.color,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+              ),
+              child: const Text('אסוף פרס!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget _buildBottomSection() {
-    final canSpin = !_isSpinning && _spinsAvailable > 0;
-    final canWatch = !_isSpinning && _canEarnMore;
+  // ─── Bottom controls ────────────────────────────────────────────────────────
+
+  Widget _buildControls() {
+    final canSpin  = !_isSpinning && _spinsAvailable > 0 && _wonPrize == null;
+    final canWatch = !_isSpinning && _canEarnMore && _wonPrize == null;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
+        color: Colors.black.withValues(alpha: 0.55),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Spins available + dot indicators in one row
+          // Spins available + ad progress dots
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'סיבובים: $_spinsAvailable  ',
-                style: TextStyle(
-                  color: _spinsAvailable > 0 ? Colors.greenAccent : Colors.white38,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text('סיבובים: $_spinsAvailable  ',
+                  style: TextStyle(
+                    color: _spinsAvailable > 0 ? Colors.greenAccent : Colors.white38,
+                    fontSize: 14, fontWeight: FontWeight.bold,
+                  )),
               ...List.generate(_maxDailySpins, (i) => AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                width: 10,
-                height: 10,
+                width: 10, height: 10,
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -636,13 +474,11 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                       : null,
                 ),
               )),
-              Text(
-                '  $_adsWatched/$_maxDailySpins פרסומות',
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
-              ),
+              Text('  $_adsWatched/$_maxDailySpins פרסומות',
+                  style: const TextStyle(color: Colors.white38, fontSize: 12)),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           // Spin button
           AnimatedBuilder(
             animation: _glowAnim,
@@ -652,7 +488,9 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: canSpin
-                    ? [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: _glowAnim.value * 0.7), blurRadius: 18, spreadRadius: 3)]
+                    ? [BoxShadow(
+                        color: const Color(0xFFFFD700).withValues(alpha: _glowAnim.value * 0.8),
+                        blurRadius: 20, spreadRadius: 4)]
                     : null,
               ),
               child: child,
@@ -669,25 +507,30 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                   elevation: 0,
                 ),
                 child: _isSpinning
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.black54, strokeWidth: 3))
+                    ? const SizedBox(width: 24, height: 24,
+                        child: CircularProgressIndicator(color: Colors.black54, strokeWidth: 3))
                     : Text(
-                        canSpin ? '🎰  סובב עכשיו!' : (_spinsAvailable == 0 ? 'צפה בפרסומת לסיבוב' : 'צפה בפרסומת'),
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: canSpin ? Colors.black : Colors.white38),
+                        canSpin ? '🎰  סובב עכשיו!' : (_wonPrize != null ? 'אסוף את הפרס תחילה' : 'צפה בפרסומת לסיבוב'),
+                        style: TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.bold,
+                          color: canSpin ? Colors.black : Colors.white38,
+                        ),
                       ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           // Watch ad button
           SizedBox(
             width: double.infinity,
-            height: 40,
+            height: 38,
             child: OutlinedButton.icon(
               onPressed: canWatch ? _watchAdForSpin : null,
-              icon: Icon(Icons.ondemand_video, size: 16, color: canWatch ? Colors.amber : Colors.white24),
+              icon: Icon(Icons.ondemand_video, size: 16,
+                  color: canWatch ? Colors.amber : Colors.white24),
               label: Text(
                 _canEarnMore ? 'צפה בפרסומת לקבלת סיבוב' : 'הגעת למקסימום סיבובים היום',
-                style: TextStyle(fontSize: 13, color: canWatch ? Colors.amber : Colors.white24),
+                style: TextStyle(fontSize: 12, color: canWatch ? Colors.amber : Colors.white24),
               ),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: canWatch ? Colors.amber.withValues(alpha: 0.6) : Colors.white12),
@@ -696,6 +539,64 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── Odds dialog ────────────────────────────────────────────────────────────
+
+  void _showOddsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [
+            Icon(Icons.info_outline, color: Colors.blueAccent, size: 22),
+            SizedBox(width: 10),
+            Text('טבלת הסיכויים',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final prize in _prizes)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        decoration: BoxDecoration(
+                          color: prize.color.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('${prize.weight}%',
+                            style: TextStyle(color: prize.color, fontSize: 13, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(prize.displayName,
+                          style: const TextStyle(color: Colors.white, fontSize: 14))),
+                      Container(
+                        width: 10, height: 10,
+                        decoration: BoxDecoration(color: prize.color, shape: BoxShape.circle),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('הבנתי', style: TextStyle(color: Colors.blueAccent, fontSize: 16)),
+            ),
+          ],
+        ),
       ),
     );
   }

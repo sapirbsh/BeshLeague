@@ -100,8 +100,10 @@ class _GameBoardScreenState extends State<GameBoardScreen>
 
   // rage-quit table-flip animation
   late AnimationController _rageController;
-  late Animation<double> _rageShakeAnim;   // translateX shake
-  late Animation<double> _rageFlipAnim;    // rotateX flip
+  late Animation<double> _rageShakeAnim;    // translateX shake
+  late Animation<double> _rageFlipAnim;     // rotateX flip
+  late Animation<double> _rageFlyAnim;      // translateY — flies off screen
+  late Animation<double> _rageEmojiAnim;    // emoji overlay opacity+scale
 
   late AnimationController _pulseController;
   late Animation<double> _pulseScale;
@@ -147,23 +149,37 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     _diceShakeX = Tween<double>(begin: -6.0, end: 6.0).animate(_diceController);
     _diceRotation = Tween<double>(begin: -0.18, end: 0.18).animate(_diceController);
 
-    // rage-quit table flip (700ms total: 280ms shake + 420ms flip out)
+    // rage-quit table flip (1100ms total: 300ms shake → 800ms fly+flip)
     _rageController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 1100),
     );
+    // Phase 1 (0–27%): rapid left-right shake to build tension
     _rageShakeAnim = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 18.0), weight: 8),
-      TweenSequenceItem(tween: Tween(begin: 18.0, end: -18.0), weight: 8),
-      TweenSequenceItem(tween: Tween(begin: -18.0, end: 18.0), weight: 8),
-      TweenSequenceItem(tween: Tween(begin: 18.0, end: -18.0), weight: 8),
-      TweenSequenceItem(tween: Tween(begin: -18.0, end: 0.0), weight: 8),
-      TweenSequenceItem(tween: ConstantTween(0.0), weight: 60),
-    ]).animate(_rageController);
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 22.0),   weight: 7),
+      TweenSequenceItem(tween: Tween(begin: 22.0, end: -22.0), weight: 7),
+      TweenSequenceItem(tween: Tween(begin: -22.0, end: 22.0), weight: 7),
+      TweenSequenceItem(tween: Tween(begin: 22.0, end: -22.0), weight: 6),
+      TweenSequenceItem(tween: ConstantTween(0.0),              weight: 73),
+    ]).animate(CurvedAnimation(parent: _rageController, curve: Curves.linear));
+    // Phase 2 (27–100%): rotateX backward (pivot at bottom = board tips away from player)
     _rageFlipAnim = TweenSequence<double>([
-      TweenSequenceItem(tween: ConstantTween(0.0), weight: 40),
-      TweenSequenceItem(
-          tween: Tween(begin: 0.0, end: -pi * 1.05), weight: 60),
+      TweenSequenceItem(tween: ConstantTween(0.0),                         weight: 27),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -pi * 1.1)
+          .chain(CurveTween(curve: Curves.easeIn)),                        weight: 73),
+    ]).animate(_rageController);
+    // Phase 2 (27–100%): board flies upward off screen
+    _rageFlyAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(0.0),                         weight: 27),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -700.0)
+          .chain(CurveTween(curve: Curves.easeIn)),                        weight: 73),
+    ]).animate(_rageController);
+    // Emoji popup: fades in fast at 20%, stays, fades at end
+    _rageEmojiAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(0.0),              weight: 18),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0),     weight: 12),
+      TweenSequenceItem(tween: ConstantTween(1.0),              weight: 55),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0),     weight: 15),
     ]).animate(_rageController);
 
     // coin fly (win celebration)
@@ -1131,53 +1147,78 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     // ── playing board, wrapped in rage-flip animation ──
     return Directionality(
       textDirection: TextDirection.ltr,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: 1.5,
-          child: AnimatedBuilder(
-            animation: _rageController,
-            builder: (ctx, child) {
-              return Transform.translate(
-                offset: Offset(_rageShakeAnim.value, 0),
-                child: Transform(
-                  alignment: Alignment.bottomCenter,
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.001)
-                    ..rotateX(_rageFlipAnim.value),
-                  child: child,
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF5C3A21), Color(0xFF8B5A2B), Color(0xFF5C3A21)],
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                ),
-                border: Border.all(color: const Color(0xFF2E1C11), width: 3),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 15, offset: Offset(0, 10))],
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFDEBCE),
-                  border: Border.all(color: const Color(0xFF3E2723), width: 2),
-                ),
-                child: LayoutBuilder(
-                  builder: (ctx, innerC) {
-                    const double barW = 40, bornOffW = 55;
-                    final double pointAreaW = innerC.maxWidth - barW - bornOffW;
-                    final double pointW = pointAreaW / 12;
-                    final double colH = (innerC.maxHeight - 42) / 2;
-                    final double cs = min(pointW * 0.86, colH / 5.4).clamp(10.0, 36.0);
-                    return _buildBoardRow(barW, bornOffW, cs);
-                  },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Board (with shake + fly + flip transforms)
+          Center(
+            child: AspectRatio(
+              aspectRatio: 1.5,
+              child: AnimatedBuilder(
+                animation: _rageController,
+                builder: (ctx, child) {
+                  return Transform.translate(
+                    offset: Offset(_rageShakeAnim.value, _rageFlyAnim.value),
+                    child: Transform(
+                      alignment: Alignment.bottomCenter,
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.001)
+                        ..rotateX(_rageFlipAnim.value),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF5C3A21), Color(0xFF8B5A2B), Color(0xFF5C3A21)],
+                      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    ),
+                    border: Border.all(color: const Color(0xFF2E1C11), width: 3),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 15, offset: Offset(0, 10))],
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDEBCE),
+                      border: Border.all(color: const Color(0xFF3E2723), width: 2),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (ctx, innerC) {
+                        const double barW = 40, bornOffW = 55;
+                        final double pointAreaW = innerC.maxWidth - barW - bornOffW;
+                        final double pointW = pointAreaW / 12;
+                        final double colH = (innerC.maxHeight - 42) / 2;
+                        final double cs = min(pointW * 0.86, colH / 5.4).clamp(10.0, 36.0);
+                        return _buildBoardRow(barW, bornOffW, cs);
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+          // Rage-quit emoji overlay
+          AnimatedBuilder(
+            animation: _rageEmojiAnim,
+            builder: (ctx, _) {
+              if (_rageEmojiAnim.value <= 0) return const SizedBox.shrink();
+              return Opacity(
+                opacity: _rageEmojiAnim.value,
+                child: const Text(
+                  '（╯°□°）╯︵ ┻━┻',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [Shadow(color: Colors.black87, blurRadius: 10)],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

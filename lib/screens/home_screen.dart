@@ -1025,36 +1025,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           if (!_isFriendsPanelOpen)
                             Positioned(
                               right: 10,
-                              bottom: height * 0.08,
-                              child: AnimatedBuilder(
-                                animation: _spinBlinkAnim,
-                                builder: (ctx, child) => Opacity(
-                                  opacity: _spinBlinkAnim.value,
-                                  child: child,
-                                ),
-                                child: GestureDetector(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => SpinWheelScreen(
-                                      sessionTicket: widget.sessionTicket,
-                                      playFabId: widget.playFabId,
-                                    )),
-                                  ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
-                                  child: Container(
-                                    width: height * 0.13,
-                                    height: height * 0.13,
+                              top: 0,
+                              bottom: 0,
+                              child: Center(
+                                child: AnimatedBuilder(
+                                  animation: _spinBlinkAnim,
+                                  builder: (ctx, child) => Container(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: const RadialGradient(colors: [Color(0xFFFFE066), Color(0xFFB8860B)]),
-                                      border: Border.all(color: Colors.white, width: 2.5),
-                                      boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.8), blurRadius: 16, spreadRadius: 3)],
+                                      boxShadow: [BoxShadow(
+                                        color: Colors.amber.withValues(alpha: _spinBlinkAnim.value * 0.9),
+                                        blurRadius: 28,
+                                        spreadRadius: 6,
+                                      )],
                                     ),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: const [
-                                        Text('🎰', style: TextStyle(fontSize: 26)),
-                                        Text('גלגל\nמזל', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87, height: 1.1), textAlign: TextAlign.center),
-                                      ],
+                                    child: child,
+                                  ),
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => SpinWheelScreen(
+                                        sessionTicket: widget.sessionTicket,
+                                        playFabId: widget.playFabId,
+                                      )),
+                                    ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
+                                    child: Container(
+                                      width: height * 0.20,
+                                      height: height * 0.20,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: const RadialGradient(
+                                          colors: [Color(0xFFFFF176), Color(0xFFFFD700), Color(0xFFB8860B)],
+                                          stops: [0.0, 0.6, 1.0],
+                                        ),
+                                        border: Border.all(color: Colors.white, width: 3),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: const [
+                                          Text('🎰', style: TextStyle(fontSize: 32)),
+                                          SizedBox(height: 2),
+                                          Text('גלגל\nמזל', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black, height: 1.1), textAlign: TextAlign.center),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1354,42 +1367,6 @@ Widget _buildLeftMenu(double width, double height) {
                 ),
               ),
               child: _buildSquareMenuButton(Icons.table_chart, const Color(0xFF9C7BEA), buttonSize),
-            ),
-            SizedBox(height: height * 0.02),
-            GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SpinWheelScreen(
-                    sessionTicket: widget.sessionTicket,
-                    playFabId: widget.playFabId,
-                  ),
-                ),
-              ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  _buildSquareMenuButton(Icons.casino, const Color(0xFFFFD700), buttonSize),
-                  Positioned(
-                    top: -4,
-                    left: -4,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.8, end: 1.2),
-                      duration: const Duration(milliseconds: 700),
-                      curve: Curves.easeInOut,
-                      builder: (ctx, scale, child) => Transform.scale(scale: scale, child: child),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Text('★', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
