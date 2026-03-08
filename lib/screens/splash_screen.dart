@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:besh_league/screens/auth_screen.dart';
 import 'package:besh_league/screens/home_screen.dart';
@@ -34,36 +36,67 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkLogin() async {
-    // מחכים לפחות 2 שניות כדי להציג את המסך
     await Future.delayed(const Duration(seconds: 2));
-
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final sessionTicket = prefs.getString('sessionTicket');
-    final playFabId = prefs.getString('playFabId');
+    final identifier = prefs.getString('loginIdentifier');
+    final password   = prefs.getString('loginPassword');
+    final isEmail    = prefs.getBool('loginIsEmail') ?? false;
 
-    if (!mounted) return;
+    // ניסיון Silent Login — מתחבר מחדש לשרת כדי לקבל Ticket טרי
+    if (identifier != null && identifier.isNotEmpty &&
+        password   != null && password.isNotEmpty) {
+      try {
+        const titleId = "1A15A2";
+        final endpoint = isEmail ? 'LoginWithEmailAddress' : 'LoginWithPlayFab';
+        final url = Uri.parse('https://$titleId.playfabapi.com/Client/$endpoint');
+        final Map<String, dynamic> body = {"TitleId": titleId, "Password": password};
+        if (isEmail) {
+          body["Email"] = identifier;
+        } else {
+          body["Username"] = identifier;
+        }
 
-    if (sessionTicket != null && sessionTicket.isNotEmpty &&
-        playFabId != null && playFabId.isNotEmpty) {
-      // יש פרטי התחברות שמורים - עוברים ישירות למסך הבית
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(
-            sessionTicket: sessionTicket,
-            playFabId: playFabId,
-          ),
-        ),
-      );
-    } else {
-      // אין פרטים שמורים - עוברים למסך ההתחברות
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => AuthScreen()),
-      );
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(body),
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          final data       = json.decode(response.body)['data'];
+          final newTicket  = data['SessionTicket'] as String;
+          final newPfId    = data['PlayFabId']     as String;
+
+          await prefs.setString('sessionTicket', newTicket);
+          await prefs.setString('playFabId',     newPfId);
+
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                sessionTicket: newTicket,
+                playFabId:     newPfId,
+              ),
+            ),
+          );
+          return;
+        }
+      } catch (e) {
+        debugPrint("Silent login failed: $e");
+      }
     }
+
+    // אם הכניסה השקטה נכשלה — עוברים למסך ההתחברות
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const AuthScreen()),
+    );
   }
 
   @override

@@ -20,12 +20,15 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  String playfabUsername = "טוען..."; 
-  String userEmail = ""; 
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  String playfabUsername = "טוען...";
+  String userEmail = "";
   bool _isFriendsPanelOpen = false;
   bool _isNavigatingToGame = false;
   int coins = 0;
+  int _previousCoins = 0;
+  bool _showCoinFly = false;
+  late AnimationController _coinFlyController;
   int trophies = 0;
   int xp = 0;
   int dailyGamesPlayed = 0;
@@ -103,16 +106,26 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchPlayerData(); 
+    _coinFlyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() { _showCoinFly = false; });
+        _coinFlyController.reset();
+      }
+    });
+    _fetchPlayerData();
     _liveRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _fetchPlayerData(isBackground: true); 
+      _fetchPlayerData(isBackground: true);
     });
   }
 
   @override
   void dispose() {
+    _coinFlyController.dispose();
     _friendAddController.dispose();
-    _liveRefreshTimer?.cancel(); 
+    _liveRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -143,11 +156,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _fetchPlayerData({bool isBackground = false}) async {
-    const titleId = "1A15A2"; 
+  Future<void> _fetchPlayerData({bool isBackground = false, bool showCoinAnimation = false}) async {
+    final oldCoins = coins; // לכידת הערך הנוכחי לפני הקריאה האסינכרונית
+    const titleId = "1A15A2";
     final headers = {
       'Content-Type': 'application/json',
-      'X-Authorization': widget.sessionTicket, 
+      'X-Authorization': widget.sessionTicket,
     };
 
     try {
@@ -264,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   roomId: duelStatus['roomId']?.toString() ?? "",
                 ),
               ),
-            ).then((_) { if (mounted) _fetchPlayerData(); });
+            ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); });
           }
         }
 
@@ -297,6 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             playfabUsername = userInfo['Username'] ?? "שחקן";
             userEmail = privateInfo?['Email'] ?? "";
+            _previousCoins = oldCoins;
             coins = fetchedCoins;
             xp = fetchedXp;
             streakDays = fetchedStreakDays;
@@ -309,6 +324,11 @@ class _HomeScreenState extends State<HomeScreen> {
             onlineFriendIds = fetchedOnlineIds;
             isLoadingData = false;
           });
+          // הצג אנימציית מטבעות אם המטבעות עלו ובוצעה חזרה ממסך אחר
+          if (showCoinAnimation && fetchedCoins > oldCoins) {
+            setState(() { _showCoinFly = true; });
+            _coinFlyController.forward();
+          }
         }
       }
     } catch (e) {}
@@ -993,6 +1013,37 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
+
+              // --- אנימציית מטבעות עפים ---
+              if (!isLoadingData && _showCoinFly)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _coinFlyController,
+                      builder: (ctx, _) => Stack(
+                        children: List.generate(9, (i) {
+                          final delay = i * 0.09;
+                          final t = (_coinFlyController.value - delay).clamp(0.0, 1.0);
+                          if (t <= 0) return const SizedBox.shrink();
+                          final x = width * (0.07 + i * 0.105);
+                          final yStart = height * 0.92;
+                          final yEnd   = height * (0.05 + (i % 3) * 0.08);
+                          final eased  = Curves.easeOut.transform(t);
+                          final y = yStart - (yStart - yEnd) * eased;
+                          final opacity = (t * 4).clamp(0.0, 1.0) * ((1.0 - t) * 3).clamp(0.0, 1.0);
+                          return Positioned(
+                            left: x,
+                            top: y,
+                            child: Opacity(
+                              opacity: opacity.clamp(0.0, 1.0),
+                              child: const Icon(Icons.monetization_on, color: Colors.amber, size: 30),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
           },
@@ -1171,7 +1222,16 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Flexible(child: Text(playfabUsername, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: fs, fontWeight: FontWeight.bold))),
           Text("ליגה - בקרוב", style: TextStyle(color: Colors.white54, fontSize: fs * 0.85, fontStyle: FontStyle.italic)),
-          Row(children: [Icon(Icons.monetization_on, color: Colors.amber, size: iconSz), const SizedBox(width: 3), Text("$coins", style: TextStyle(color: Colors.white, fontSize: fs))]),
+          Row(children: [
+            Icon(Icons.monetization_on, color: Colors.amber, size: iconSz),
+            const SizedBox(width: 3),
+            TweenAnimationBuilder<int>(
+              key: ValueKey(coins),
+              tween: IntTween(begin: _previousCoins, end: coins),
+              duration: const Duration(milliseconds: 900),
+              builder: (ctx, value, _) => Text("$value", style: TextStyle(color: Colors.white, fontSize: fs)),
+            ),
+          ]),
           Row(children: [Icon(Icons.emoji_events, color: Colors.amber, size: iconSz), const SizedBox(width: 3), Text("$trophies", style: TextStyle(color: Colors.white, fontSize: fs))]),
           IconButton(icon: Icon(Icons.settings, color: Colors.white, size: iconSz), onPressed: _showSettingsMenu, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           IconButton(
@@ -1220,7 +1280,6 @@ Widget _buildLeftMenu(double width, double height) {
                       Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 14), SizedBox(width: 2), Text("+50", style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.bold))]),
                       const SizedBox(height: 2),
                       const Icon(Icons.ondemand_video, size: 28, color: Colors.black87),
-                      const Text("צפה", style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
                     ]
                   )
                 ),
@@ -1259,7 +1318,7 @@ Widget _buildLeftMenu(double width, double height) {
                    );
                    if (mounted) {
                      setState(() { _isNavigatingToGame = false; });
-                     _fetchPlayerData(); // refresh coins/XP after returning from game
+                     _fetchPlayerData(showCoinAnimation: true); // refresh + coin animation after game
                    }
                 },
                 child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [

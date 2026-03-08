@@ -109,10 +109,13 @@ Future<void> _loginUser() async {
 
         setState(() { _isLoading = false; });
 
-        // 3. שומרים את פרטי ההתחברות לשימוש עתידי
+        // 3. שומרים את פרטי ההתחברות לשימוש עתידי (כולל פרטים לצורך Silent Login)
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('sessionTicket', sessionTicket);
         await prefs.setString('playFabId', playFabId);
+        await prefs.setString('loginIdentifier', identifier);
+        await prefs.setString('loginPassword', password);
+        await prefs.setBool('loginIsEmail', isEmail);
 
         // 4. אם הכל תקין והוא לא חסום, מכניסים אותו למסך הבית
         if (mounted) {

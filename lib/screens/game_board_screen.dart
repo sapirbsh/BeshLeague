@@ -88,9 +88,6 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   // --- opponent dialog ---
   bool _showOpponentDialog = false;
 
-  // --- game timing ---
-  late DateTime _gameStartTime;
-  Duration _gameDuration = Duration.zero;
 
   // --- animation controllers ---
   late AnimationController _diceController;
@@ -141,8 +138,6 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   @override
   void initState() {
     super.initState();
-    _gameStartTime = DateTime.now();
-
     // dice shake
     _diceController = AnimationController(
       vsync: this,
@@ -295,8 +290,9 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     await _rageController.forward();
 
     if (!mounted) return;
+    // סגור את חדר המשחק ולאחר מכן הצג מסך סיום (היריב ניצח)
     if (!_isSimulation) _liveGameService?.closeRoom();
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    _endGame(winnerName: widget.opponentName);
   }
 
   Future<void> _deductRageQuitPenalty() async {
@@ -343,7 +339,6 @@ class _GameBoardScreenState extends State<GameBoardScreen>
       });
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
-          _gameStartTime = DateTime.now(); // start clock when game actually begins
           setState(() { _gameState = "playing"; _isRolling = false; });
           _startTurnTimer();
           if (_isBotMatch && _currentTurnId == widget.opponentId) _scheduleBotTurn();
@@ -736,7 +731,6 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   void _endGame({required String winnerName}) {
     _turnTimer?.cancel();
     final iWon = winnerName == widget.myName;
-    _gameDuration = DateTime.now().difference(_gameStartTime);
     setState(() { _gameState = "gameOver"; _winnerIsMe = iWon; });
     _awardXPAndCoins(iWon: iWon);
   }
@@ -1630,328 +1624,255 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     );
   }
 
-  // ─── win/loss screen ──────────────────────────────────────────────────────
+  // ─── unified end-game overlay ─────────────────────────────────────────────
   Widget _buildWinScreen(double width, double height) {
-    final coinsAwarded = _winnerIsMe ? widget.betAmount * 2 : 0;
-    final winnerLabel = _winnerIsMe ? widget.myName : widget.opponentName;
-    final didLevelUp = _levelAfter > _levelBefore;
-    final xpNeeded = _xpNeededForLevel(_levelAfter);
-    final xpInLevel = _xpInCurrentLevel(_totalXpAfter, _levelAfter);
-    final progressFraction = xpNeeded > 0 ? (xpInLevel / xpNeeded).clamp(0.0, 1.0) : 0.0;
+    final totalPot   = widget.betAmount * 2;
+    final xpNeeded   = _xpNeededForLevel(_levelAfter);
+    final xpInLevel  = _xpInCurrentLevel(_totalXpAfter, _levelAfter);
+    final xpFraction = xpNeeded > 0 ? (xpInLevel / xpNeeded).clamp(0.0, 1.0) : 0.0;
 
-    // format game duration
-    final mins = _gameDuration.inMinutes;
-    final secs = _gameDuration.inSeconds % 60;
-    final durationStr = "$mins:${secs.toString().padLeft(2, '0')}";
+    // In RTL Row layout: first child = RIGHT side = my panel
+    // If I win → coins fly RIGHT; if opponent wins → fly LEFT
+    final coinTargetX = _winnerIsMe ? width * 0.88 : width * 0.08;
 
     return Positioned.fill(
       child: Stack(
         children: [
-          // semi-transparent backdrop (board visible behind)
-          Container(color: Colors.black.withValues(alpha: 0.65)),
+          // ── semi-transparent backdrop ──
+          Container(color: Colors.black.withValues(alpha: 0.68)),
 
-          // flying coins animation (winner only)
-          if (_winnerIsMe)
-            AnimatedBuilder(
-              animation: _coinFlyAnim,
-              builder: (ctx, _) {
-                return Stack(
-                  children: List.generate(6, (i) {
-                    final xFrac = 0.12 + i * 0.15;
-                    final yStart = height * 0.9;
-                    final yEnd = height * 0.1;
-                    final delay = i * 0.12;
-                    final progress = (_coinFlyAnim.value - delay).clamp(0.0, 1.0);
-                    final yPos = yStart - (yStart - yEnd) * progress;
-                    return Positioned(
-                      left: width * xFrac,
-                      top: yPos,
-                      child: Opacity(
-                        opacity: progress < 0.85 ? 1.0 : (1.0 - progress) / 0.15,
-                        child: const Icon(Icons.monetization_on,
-                            color: Colors.amber, size: 28),
-                      ),
-                    );
-                  }),
-                );
-              },
-            ),
-
-          Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0.55, end: 1.0),
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.elasticOut,
-            builder: (ctx, scale, child) => Transform.scale(scale: scale, child: child),
-            child: SingleChildScrollView(
-              child: Container(
-                width: width * 0.68,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0A192F), Color(0xFF1A3A5C)],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+          // ── flying pot coins (center → winner side) ──
+          AnimatedBuilder(
+            animation: _coinFlyAnim,
+            builder: (ctx, _) => Stack(
+              children: List.generate(9, (i) {
+                final delay    = i * 0.09;
+                final t        = (_coinFlyAnim.value - delay).clamp(0.0, 1.0);
+                if (t <= 0) return const SizedBox.shrink();
+                final eased    = Curves.easeOut.transform(t);
+                final x        = width * 0.5 + (coinTargetX - width * 0.5) * eased;
+                final yTarget  = height * (0.22 + (i % 4) * 0.11);
+                final y        = height * 0.5 + (yTarget - height * 0.5) * eased;
+                final opacity  = (t * 5).clamp(0.0, 1.0) * ((1.0 - t) * 3).clamp(0.0, 1.0);
+                return Positioned(
+                  left: x - 16,
+                  top:  y - 16,
+                  child: Opacity(
+                    opacity: opacity.clamp(0.0, 1.0),
+                    child: const Icon(Icons.monetization_on, color: Colors.amber, size: 32),
                   ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.amber, width: 2.5),
-                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, spreadRadius: 5)],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // trophy / sad icon
-                    TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0.5, end: 1.0),
-                      duration: const Duration(milliseconds: 500),
-                      builder: (ctx, s, child) => Transform.scale(scale: s, child: child),
-                      child: Icon(
-                        _winnerIsMe ? Icons.emoji_events : Icons.sentiment_dissatisfied,
-                        color: _winnerIsMe ? Colors.amber : Colors.grey,
-                        size: 72,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _winnerIsMe ? "ניצחת!" : "הפסדת",
-                      style: TextStyle(
-                          fontSize: 36, fontWeight: FontWeight.bold,
-                          color: _winnerIsMe ? Colors.amber : Colors.white60),
-                    ),
-                    Text(winnerLabel, style: const TextStyle(fontSize: 16, color: Colors.white70)),
-                    const SizedBox(height: 16),
-
-                    // ── game summary row ──
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _summaryTile(Icons.timer_outlined, durationStr, "זמן"),
-                          _summaryDivider(),
-                          _summaryTile(Icons.check_circle_outline, "$_myBorneOff / 15", "יצאו"),
-                          _summaryDivider(),
-                          _summaryTile(
-                            Icons.local_fire_department,
-                            "$_winStreak",
-                            "רצף ניצחונות",
-                            color: _winStreak >= 3 ? Colors.orangeAccent : Colors.white70,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── win streak banner ──
-                    if (_winnerIsMe && _winStreak > 1)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                              colors: [Color(0xFFFF6F00), Color(0xFFFF8F00)]),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.5), blurRadius: 10)],
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.local_fire_department, color: Colors.white, size: 22),
-                            const SizedBox(width: 6),
-                            Text("רצף של $_winStreak ניצחונות!",
-                                style: const TextStyle(
-                                    color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                            if (_winStreak == _bestWinStreak && _bestWinStreak > 1) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(6)),
-                                child: const Text("שיא!", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-
-                    // ── coins (winner only) ──
-                    if (_winnerIsMe)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.black38,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.monetization_on, color: Colors.amber, size: 24),
-                            const SizedBox(width: 8),
-                            Text("+$coinsAwarded מטבעות",
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
-                          ],
-                        ),
-                      ),
-
-                    // ── XP ──
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.black38,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.5)),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.star, color: Colors.lightBlueAccent, size: 22),
-                              const SizedBox(width: 8),
-                              Text("+$_xpEarned XP",
-                                  style: const TextStyle(
-                                      fontSize: 20, fontWeight: FontWeight.bold, color: Colors.lightBlueAccent)),
-                              if (_isBoostGame) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(8)),
-                                  child: const Text("x2 בונוס!", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 0, end: progressFraction),
-                              duration: const Duration(milliseconds: 900),
-                              builder: (ctx, val, _) => LinearProgressIndicator(
-                                value: val,
-                                backgroundColor: Colors.grey[700],
-                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.lightBlueAccent),
-                                minHeight: 7,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text("רמה $_levelAfter  •  $xpInLevel / $xpNeeded XP",
-                              style: const TextStyle(fontSize: 11, color: Colors.white54)),
-                        ],
-                      ),
-                    ),
-
-                    // ── level-up banner ──
-                    if (didLevelUp) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFFFFB300), Color(0xFFFF6F00)]),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
-                            const SizedBox(width: 6),
-                            Text("עלית לרמה $_levelAfter!",
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 22),
-
-                    // ── action buttons ──
-                    Row(
-                      children: [
-                        // Play Again
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1565C0),
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                              elevation: 4,
-                            ),
-                            onPressed: () {
-                              if (_isBotMatch) {
-                                Navigator.pop(context); // back to pre-game
-                              } else {
-                                Navigator.of(context).popUntil((route) => route.isFirst);
-                              }
-                            },
-                            child: const Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.replay, color: Colors.white, size: 22),
-                                SizedBox(height: 3),
-                                Text("שחק שוב", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Home
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _winnerIsMe ? Colors.amber : Colors.blueGrey,
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                            ),
-                            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.home, color: _winnerIsMe ? Colors.black : Colors.white, size: 22),
-                                const SizedBox(height: 3),
-                                Text("בית",
-                                    style: TextStyle(
-                                        fontSize: 14, fontWeight: FontWeight.bold,
-                                        color: _winnerIsMe ? Colors.black : Colors.white)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+                );
+              }),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-  }
 
-  Widget _summaryTile(IconData icon, String value, String label, {Color color = Colors.white70}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 18),
-        const SizedBox(height: 3),
-        Text(value, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-      ],
+          // ── main layout ──
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: width  * 0.02,
+              vertical:   height * 0.04,
+            ),
+            child: Column(
+              children: [
+                // Player cards row
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // LEFT in RTL = opponent
+                      Expanded(child: _buildEndGamePlayerCard(
+                        name: widget.opponentName, isWinner: !_winnerIsMe)),
+                      // CENTER: pot display
+                      SizedBox(
+                        width: width * 0.18,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.monetization_on, color: Colors.amber, size: 44),
+                            const SizedBox(height: 6),
+                            Text("$totalPot",
+                                style: const TextStyle(
+                                    fontSize: 30, fontWeight: FontWeight.bold, color: Colors.amber)),
+                            const Text("קופה",
+                                style: TextStyle(color: Colors.white60, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      // RIGHT in RTL = me
+                      Expanded(child: _buildEndGamePlayerCard(
+                        name: widget.myName, isWinner: _winnerIsMe)),
+                    ],
+                  ),
+                ),
+
+                // ── XP + streak info row ──
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.4)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // XP line
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star, color: Colors.lightBlueAccent, size: 17),
+                          const SizedBox(width: 4),
+                          Text("+$_xpEarned XP",
+                              style: const TextStyle(
+                                  color: Colors.lightBlueAccent,
+                                  fontWeight: FontWeight.bold, fontSize: 15)),
+                          if (_isBoostGame) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  borderRadius: BorderRadius.circular(6)),
+                              child: const Text("x2",
+                                  style: TextStyle(
+                                      fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                            ),
+                          ],
+                          if (_levelAfter > _levelBefore) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_upward, color: Colors.orangeAccent, size: 15),
+                            Text(" רמה $_levelAfter!",
+                                style: const TextStyle(
+                                    color: Colors.orangeAccent,
+                                    fontWeight: FontWeight.bold, fontSize: 13)),
+                          ],
+                          if (_winnerIsMe && _winStreak > 1) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.local_fire_department,
+                                color: Colors.deepOrangeAccent, size: 15),
+                            Text(" רצף $_winStreak",
+                                style: const TextStyle(
+                                    color: Colors.deepOrangeAccent,
+                                    fontWeight: FontWeight.bold, fontSize: 13)),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // XP progress bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween<double>(begin: 0, end: xpFraction),
+                          duration: const Duration(milliseconds: 900),
+                          builder: (ctx, val, _) => LinearProgressIndicator(
+                            value: val,
+                            backgroundColor: Colors.grey[700],
+                            valueColor:
+                                const AlwaysStoppedAnimation<Color>(Colors.lightBlueAccent),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text("רמה $_levelAfter  •  $xpInLevel / $xpNeeded XP",
+                          style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                    ],
+                  ),
+                ),
+
+                // ── exit button ──
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueGrey[700],
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 48, vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24)),
+                    elevation: 4,
+                  ),
+                  onPressed: () =>
+                      Navigator.of(context).popUntil((route) => route.isFirst),
+                  icon: const Icon(Icons.exit_to_app, color: Colors.white, size: 20),
+                  label: const Text("יציאה",
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                ),
+                SizedBox(height: height * 0.02),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _summaryDivider() => Container(
-    width: 1, height: 36,
-    color: Colors.white.withValues(alpha: 0.15),
-  );
+  // ─── player card for end-game overlay ────────────────────────────────────
+  Widget _buildEndGamePlayerCard({required String name, required bool isWinner}) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.5, end: 1.0),
+      duration: const Duration(milliseconds: 550),
+      curve: Curves.elasticOut,
+      builder: (ctx, scale, child) => Transform.scale(scale: scale, child: child),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // WINNER / LOSER badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+            decoration: BoxDecoration(
+              color: isWinner ? Colors.amber : Colors.grey[850],
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: isWinner
+                  ? [BoxShadow(
+                      color: Colors.amber.withValues(alpha: 0.55),
+                      blurRadius: 14)]
+                  : [],
+            ),
+            child: Text(
+              isWinner ? "WINNER" : "LOSER",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+                color: isWinner ? Colors.black : Colors.white38,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Avatar
+          Container(
+            width: 72, height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: isWinner ? Colors.amber : Colors.grey, width: 3),
+              boxShadow: isWinner
+                  ? [BoxShadow(
+                      color: Colors.amber.withValues(alpha: 0.4),
+                      blurRadius: 14)]
+                  : [],
+            ),
+            child: Icon(Icons.person,
+                color: isWinner ? Colors.amber : Colors.grey[600], size: 44),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isWinner ? Colors.white : Colors.white54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── triangle painter ─────────────────────────────────────────────────────

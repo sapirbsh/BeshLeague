@@ -285,7 +285,11 @@ class _PreGameScreenState extends State<PreGameScreen> {
                           children: [
                             const Text("VS", style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2)),
                             SizedBox(height: height * 0.02),
-                            Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 40), const SizedBox(width: 8), Text("$totalPot", style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white))]),
+                            AnimatedOpacity(
+                              opacity: isSearching ? 0.0 : 1.0,
+                              duration: const Duration(milliseconds: 600),
+                              child: Row(children: [const Icon(Icons.monetization_on, color: Colors.amber, size: 40), const SizedBox(width: 8), Text("$totalPot", style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white))]),
+                            ),
                             SizedBox(height: height * 0.03),
                             Stack(clipBehavior: Clip.none, children: [const Icon(Icons.chat_bubble, color: Colors.greenAccent, size: 40), Positioned(right: -12, bottom: -8, child: Icon(Icons.chat_bubble, color: Colors.grey[300], size: 32))]),
                           ],
