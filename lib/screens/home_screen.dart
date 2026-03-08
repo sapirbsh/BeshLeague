@@ -728,8 +728,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: MediaQuery.of(context).size.width * 0.25, padding: const EdgeInsets.symmetric(vertical: 5),
-                  decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.grey, width: 2)),
+                  width: MediaQuery.of(context).size.width * 0.25,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F1B2D), Color(0xFF0A1220)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0x44FFB300), width: 1.5),
+                    boxShadow: const [BoxShadow(color: Color(0x88000000), blurRadius: 20, offset: Offset(0, 8))],
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -758,7 +768,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMenuButton(String text, VoidCallback onTap) {
-    return Container(width: double.infinity, margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), decoration: BoxDecoration(border: Border.all(color: Colors.grey, width: 1)), child: Material(color: Colors.black, child: InkWell(onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: FittedBox(fit: BoxFit.scaleDown, child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16)))))));
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 15)),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showFriendRequestsDialog() {
@@ -1282,13 +1314,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildTopBar(double width, double height, EdgeInsets safePadding) {
-    final barH = (height * 0.055).clamp(28.0, 42.0);   // shorter bar
-    final fs = (height * 0.038).clamp(12.0, 16.0);      // larger font
-    final iconSz = (height * 0.050).clamp(20.0, 26.0);  // larger icons
+    final barH = (height * 0.055).clamp(28.0, 42.0);
+    final fs = (height * 0.038).clamp(12.0, 16.0);
+    final iconSz = (height * 0.050).clamp(20.0, 26.0);
     return Container(
       width: double.infinity,
       height: barH + safePadding.top,
-      color: Colors.black,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF060C1A), Color(0xFF0D1B2E)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: const Border(bottom: BorderSide(color: Color(0x44FFB300), width: 1.5)),
+        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 10, offset: Offset(0, 4))],
+      ),
       padding: EdgeInsets.only(top: safePadding.top, left: width * 0.015, right: width * 0.015),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1372,11 +1412,21 @@ Widget _buildLeftMenu(double width, double height) {
         ),
         Column(
           children: [
-            // --- כפתור צפייה בווידאו (באותו גובה של כפתור שחק) ---
+            // --- כפתור צפייה בווידאו ---
             Container(
               width: double.infinity, height: height * 0.16,
-              decoration: BoxDecoration(color: const Color(0xFFB4F0C0), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2), boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(0, 4), blurRadius: 4)]),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A3A2A), Color(0xFF0D2018)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.6), width: 1.5),
+                boxShadow: [BoxShadow(color: const Color(0xFF4CAF50).withValues(alpha: 0.3), blurRadius: 12, spreadRadius: 1, offset: const Offset(0, 3))],
+              ),
               child: InkWell(
+                borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("צפייה בסרטון - בקרוב!", textAlign: TextAlign.right)));
                 },
@@ -1384,9 +1434,9 @@ Widget _buildLeftMenu(double width, double height) {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 14), SizedBox(width: 2), Text("+50", style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.bold))]),
+                      Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.monetization_on, color: Colors.amber, size: 14), SizedBox(width: 2), Text("+50", style: TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold))]),
                       const SizedBox(height: 2),
-                      const Icon(Icons.ondemand_video, size: 28, color: Colors.black87),
+                      const Icon(Icons.ondemand_video, size: 28, color: Color(0xFF66BB6A)),
                     ]
                   )
                 ),
@@ -1397,7 +1447,23 @@ Widget _buildLeftMenu(double width, double height) {
             // --- כפתור שחק ---
             Container(
               width: double.infinity, height: height * 0.16,
-              decoration: BoxDecoration(gradient: LinearGradient(colors: _isNavigatingToGame ? [Colors.grey.shade600, Colors.grey.shade700] : [const Color(0xFFE040FB), const Color(0xFF536DFE)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black, width: 2)),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: _isNavigatingToGame
+                      ? [Colors.grey.shade700, Colors.grey.shade800]
+                      : [const Color(0xFFE040FB), const Color(0xFF536DFE)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isNavigatingToGame ? Colors.white24 : const Color(0xFFE040FB).withValues(alpha: 0.6),
+                  width: 1.5,
+                ),
+                boxShadow: _isNavigatingToGame ? [] : [
+                  const BoxShadow(color: Color(0x66536DFE), blurRadius: 18, spreadRadius: 2, offset: Offset(0, 4)),
+                ],
+              ),
               child: InkWell(
                 onTap: () async {
                    if (_isNavigatingToGame) return;
@@ -1450,12 +1516,16 @@ Widget _buildLeftMenu(double width, double height) {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: const Color(0xFFC4E4F5),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.black, width: 2),
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1A2E4A), Color(0xFF0D1B2E)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0x5564B5F6), width: 1.5),
+            boxShadow: const [BoxShadow(color: Color(0x4464B5F6), blurRadius: 12, spreadRadius: 1, offset: Offset(0, 3))],
           ),
-          child: Icon(Icons.people, size: size * 0.5, color: Colors.black87),
+          child: Icon(Icons.people, size: size * 0.48, color: const Color(0xFF64B5F6)),
         ),
         if (friendRequests.isNotEmpty)
           Positioned(
@@ -1472,7 +1542,24 @@ Widget _buildLeftMenu(double width, double height) {
   }
 
   Widget _buildSquareMenuButton(IconData icon, Color color, double size) {
-    return Container(width: size, height: size, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black, width: 2)), child: Icon(icon, size: size * 0.5, color: Colors.black));
+    final darkColor = Color.lerp(color, Colors.black, 0.4)!;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, darkColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.55), width: 1.5),
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 14, spreadRadius: 1, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Icon(icon, size: size * 0.48, color: Colors.white),
+    );
   }
 
   Widget _buildXpBar() {
@@ -1495,9 +1582,13 @@ Widget _buildLeftMenu(double width, double height) {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
+        gradient: LinearGradient(
+          colors: [Colors.orange.withValues(alpha: 0.12), Colors.black.withValues(alpha: 0.5)],
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+        ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange, width: 1.5),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.5), width: 1.5),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1555,9 +1646,17 @@ Widget _buildLeftMenu(double width, double height) {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A2E).withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white24, width: 1.5),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F1B2D), Color(0xFF1A2540), Color(0xFF0D1525)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0x44FFB300), width: 1.5),
+            boxShadow: const [
+              BoxShadow(color: Color(0x33FFB300), blurRadius: 20, spreadRadius: 1),
+              BoxShadow(color: Color(0x66000000), blurRadius: 12, offset: Offset(0, 6)),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1567,11 +1666,12 @@ Widget _buildLeftMenu(double width, double height) {
                 width: avatarR * 2,
                 height: avatarR * 2,
                 decoration: BoxDecoration(
-                  color: Colors.grey[700],
+                  color: const Color(0xFF1E2A40),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.amber, width: 2.5),
+                  boxShadow: const [BoxShadow(color: Color(0x66FFB300), blurRadius: 16, spreadRadius: 2)],
                 ),
-                child: Icon(Icons.person, size: avatarR * 1.1, color: Colors.grey[300]),
+                child: Icon(Icons.person, size: avatarR * 1.1, color: Colors.grey[400]),
               ),
               const SizedBox(height: 6),
               // Username
@@ -1602,67 +1702,110 @@ Widget _buildLeftMenu(double width, double height) {
   }
 
   Widget _buildStatBadge(IconData icon, String value, String label, Color color) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 2),
-        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.white54)),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 2),
+          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.white54)),
+        ],
+      ),
     );
   }
 
   Widget _buildFriendsPanel(double width, double height) {
     return Container(
-      decoration: BoxDecoration(color: const Color(0xFFC4E4F5), border: Border.all(color: Colors.white, width: 3)),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0D1B2E), Color(0xFF0A1520)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border.all(color: const Color(0x5564B5F6), width: 1.5),
+        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 20)],
+      ),
       child: Column(
         children: [
           Container(
-            width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 5), color: Colors.transparent,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0x3364B5F6), width: 1)),
+            ),
             child: Stack(
               alignment: Alignment.center,
               children: [
-                const Text("חברים", textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                Positioned(left: 5, child: Stack(children: [IconButton(icon: const Icon(Icons.person_add_alt_1, size: 24, color: Colors.black), onPressed: _showFriendRequestsDialog), if (friendRequests.isNotEmpty) Positioned(right: 8, top: 8, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: Text('${friendRequests.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))))])),
-                Positioned(right: 5, child: IconButton(icon: const Icon(Icons.close, size: 24, color: Colors.black), onPressed: () => setState(() => _isFriendsPanelOpen = false))),
+                const Text("חברים", textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                Positioned(left: 5, child: Stack(children: [IconButton(icon: const Icon(Icons.person_add_alt_1, size: 24, color: Color(0xFF64B5F6)), onPressed: _showFriendRequestsDialog), if (friendRequests.isNotEmpty) Positioned(right: 8, top: 8, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: Text('${friendRequests.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))))])),
+                Positioned(right: 5, child: IconButton(icon: const Icon(Icons.close, size: 24, color: Colors.white54), onPressed: () => setState(() => _isFriendsPanelOpen = false))),
               ],
             ),
           ),
-          const Divider(color: Colors.white, thickness: 3, height: 0),
           Expanded(
             child: isLoadingData
-                ? const Center(child: CircularProgressIndicator(color: Colors.black)) 
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF64B5F6)))
                 : friendsList.isEmpty
-                    ? const Center(child: Padding(padding: EdgeInsets.all(10.0), child: Text("אין חברים ברשימה", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))))
+                    ? const Center(child: Padding(padding: EdgeInsets.all(10.0), child: Text("אין חברים ברשימה", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white54))))
                     : ListView.builder(
                         itemCount: friendsList.length,
                         itemBuilder: (context, index) {
                           final friend = friendsList[index];
                           final friendName = friend["Username"] ?? "שחקן";
                           final friendPlayFabId = friend["FriendPlayFabId"];
-                          bool isOnline = onlineFriendIds.contains(friendPlayFabId); 
+                          bool isOnline = onlineFriendIds.contains(friendPlayFabId);
 
-                          return Padding(
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.04),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
+                            ),
                             child: Row(
                               children: [
                                 if (isOnline)
-                                  SizedBox(height: 30, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), onPressed: () => _showDuelInviteDialog(friendName), child: const Text("הזמן", style: TextStyle(color: Colors.white, fontSize: 12))))
+                                  SizedBox(height: 28, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A4080), padding: const EdgeInsets.symmetric(horizontal: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), onPressed: () => _showDuelInviteDialog(friendName), child: const Text("הזמן", style: TextStyle(color: Colors.white, fontSize: 11))))
                                 else
-                                  const SizedBox(width: 55), 
+                                  const SizedBox(width: 55),
                                 const Spacer(),
-                                Container(width: 12, height: 12, decoration: BoxDecoration(color: isOnline ? Colors.green : Colors.redAccent, shape: BoxShape.circle)),
+                                Container(width: 10, height: 10, decoration: BoxDecoration(color: isOnline ? Colors.greenAccent : Colors.redAccent, shape: BoxShape.circle, boxShadow: isOnline ? [const BoxShadow(color: Color(0x6600FF88), blurRadius: 6)] : [])),
                                 const SizedBox(width: 8),
-                                Flexible(child: Text(friendName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                                Flexible(child: Text(friendName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white))),
                               ],
                             ),
                           );
                         },
                       ),
           ),
-          const Divider(color: Colors.white, thickness: 3, height: 0),
-          Padding(padding: const EdgeInsets.all(8), child: Column(children: [const Text("הוסף לפי שם משתמש", style: TextStyle(fontSize: 14)), const SizedBox(height: 5), Row(children: [SizedBox(height: 30, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28559A), padding: const EdgeInsets.symmetric(horizontal: 8)), onPressed: _isAddingFriend ? null : _sendFriendRequest, child: _isAddingFriend ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח בקשה", style: TextStyle(color: Colors.white, fontSize: 12)))), const SizedBox(width: 5), Expanded(child: Container(height: 30, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black)), child: TextField(controller: _friendAddController, textAlign: TextAlign.right, decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.only(bottom: 15, right: 5), isDense: true))))])])),
+          Container(
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x3364B5F6), width: 1))),
+            padding: const EdgeInsets.all(8),
+            child: Column(children: [
+              const Text("הוסף לפי שם משתמש", style: TextStyle(fontSize: 13, color: Colors.white54)),
+              const SizedBox(height: 5),
+              Row(children: [
+                SizedBox(height: 30, child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A4080), padding: const EdgeInsets.symmetric(horizontal: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                  onPressed: _isAddingFriend ? null : _sendFriendRequest,
+                  child: _isAddingFriend ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("שלח", style: TextStyle(color: Colors.white, fontSize: 12)),
+                )),
+                const SizedBox(width: 5),
+                Expanded(child: Container(
+                  height: 30,
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white24)),
+                  child: TextField(controller: _friendAddController, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 13), decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.only(bottom: 15, right: 8), isDense: true)),
+                )),
+              ]),
+            ]),
+          ),
         ],
       ),
     );
