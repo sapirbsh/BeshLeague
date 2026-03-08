@@ -54,6 +54,12 @@ class _StoreScreenState extends State<StoreScreen> {
       if (catalogRes.statusCode == 200) {
         final data = json.decode(catalogRes.body)['data']?['Catalog'] as List<dynamic>? ?? [];
         for (final item in data) {
+          final itemId      = (item['ItemId']?.toString()      ?? '').toLowerCase();
+          final displayName = (item['DisplayName']?.toString() ?? '').toLowerCase();
+          // מסנן פתקי הגרלה / ליגה מהחנות
+          const excluded = ['ticket', 'league', 'פתק', 'ליגה', 'lottery', 'tk', 'raffle'];
+          if (excluded.any((k) => itemId.contains(k) || displayName.contains(k))) continue;
+
           final vcPrices = item['VirtualCurrencyPrices'] as Map<String, dynamic>? ?? {};
           final price = vcPrices['CO'] as int? ?? 0;
           fetchedItems.add({
