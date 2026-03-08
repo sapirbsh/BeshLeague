@@ -5,8 +5,10 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter_markdown/flutter_markdown.dart'; 
 import 'package:besh_league/screens/auth_screen.dart';
-import 'package:besh_league/screens/about_screen.dart'; 
+import 'package:besh_league/screens/about_screen.dart';
 import 'package:besh_league/screens/pre_game_screen.dart';
+import 'package:besh_league/screens/store_screen.dart';
+import 'package:besh_league/screens/inventory_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 
@@ -1253,12 +1255,21 @@ Widget _buildLeftMenu(double width, double height) {
       children: [
         Column(
           children: [
-            _buildSquareMenuButton(Icons.storefront, const Color(0xFF6AE070), buttonSize),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => StoreScreen(sessionTicket: widget.sessionTicket)),
+              ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
+              child: _buildSquareMenuButton(Icons.storefront, const Color(0xFF6AE070), buttonSize),
+            ),
             SizedBox(height: height * 0.02),
             _buildSquareMenuButton(Icons.emoji_events, const Color(0xFFFFB74D), buttonSize),
             SizedBox(height: height * 0.02),
             GestureDetector(
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("מלאי - בקרוב!", textAlign: TextAlign.right))),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => InventoryScreen(sessionTicket: widget.sessionTicket)),
+              ),
               child: _buildSquareMenuButton(Icons.inventory_2, const Color(0xFF64B5F6), buttonSize),
             ),
           ],
