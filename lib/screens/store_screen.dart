@@ -121,13 +121,17 @@ class _StoreScreenState extends State<StoreScreen> {
         _showSnack("הפריט נוסף למלאי שלך! 🎉", Colors.green);
       } else {
         final errorData = json.decode(res.body);
+        // שולף גם את ההודעה וגם את סוג השגיאה המדויק מפלייפאב
         final errorMsg = errorData['errorMessage']?.toString() ?? '';
+        final errorType = errorData['error']?.toString() ?? '';
+
         if (errorMsg.contains('InsufficientFunds') || errorMsg.contains('insufficient')) {
           _showSnack("אין לך מספיק מטבעות לרכישה.", Colors.redAccent);
-        } else if (errorMsg.contains('already') || errorMsg.contains('owned')) {
-          _showSnack("כבר יש לך פריט זה במלאי.", Colors.orange);
+        } else if (errorMsg.contains('already') || errorMsg.contains('owned') || errorType == 'ItemAlreadyOwned') {
+          _showSnack("כבר יש לך את הפריט הזה במלאי (אי אפשר לקנות פעמיים).", Colors.orange);
         } else {
-          _showSnack("הרכישה נכשלה. נסה שוב מאוחר יותר.", Colors.redAccent);
+          // מציג לנו על המסך את השגיאה המדויקת באנגלית כדי שנדע מה לתקן!
+          _showSnack("שגיאת שרת: $errorType - $errorMsg", Colors.redAccent);
         }
       }
     } catch (e) {
@@ -253,23 +257,10 @@ class _StoreScreenState extends State<StoreScreen> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossCount = constraints.maxWidth > 800 ? 3 : 2;
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: GridView.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossCount,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.4,
-            ),
-            itemCount: _items.length,
-            itemBuilder: (ctx, i) => _buildItemCard(_items[i]),
-          ),
-        );
-      },
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemCount: _items.length,
+      itemBuilder: (ctx, i) => _buildItemCard(_items[i]),
     );
   }
 
@@ -282,88 +273,98 @@ class _StoreScreenState extends State<StoreScreen> {
     final isPurchasing = _purchasing.contains(itemId);
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: canAfford
               ? [const Color(0xFF1A2A4A), const Color(0xFF0D1B2A)]
               : [const Color(0xFF1A1A1A), const Color(0xFF111111)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: canAfford ? Colors.amber.withValues(alpha: 0.6) : Colors.white12,
+          color: canAfford ? Colors.amber.withValues(alpha: 0.5) : Colors.white12,
           width: 1.5,
         ),
         boxShadow: canAfford
-            ? [BoxShadow(color: Colors.amber.withValues(alpha: 0.15), blurRadius: 12, spreadRadius: 1)]
+            ? [BoxShadow(color: Colors.amber.withValues(alpha: 0.1), blurRadius: 8)]
             : [],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.confirmation_number, color: Colors.amber, size: 24),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
+            // Icon on the right (RTL)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.confirmation_number, color: Colors.amber, size: 26),
+            ),
+            const SizedBox(width: 12),
+            // Name + description in the center
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
                     name,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-            if (description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                description,
-                style: const TextStyle(fontSize: 12, color: Colors.white54, height: 1.4),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
-                  const Icon(Icons.monetization_on, color: Colors.amber, size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    "$price",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: canAfford ? Colors.amber : Colors.grey,
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      description,
+                      style: const TextStyle(fontSize: 12, color: Colors.white54, height: 1.3),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ]),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Price + buy button on the left (RTL = left side)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.monetization_on, color: Colors.amber, size: 15),
+                    const SizedBox(width: 3),
+                    Text(
+                      "$price",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: canAfford ? Colors.amber : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 SizedBox(
-                  height: 34,
+                  width: 80,
+                  height: 30,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: canAfford ? const Color(0xFF28559A) : Colors.grey[800],
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
                     onPressed: (isPurchasing || !canAfford) ? null : () => _purchaseItem(item),
                     child: isPurchasing
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : Text(
                             canAfford ? "קנה" : "אין מספיק",
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                   ),
                 ),

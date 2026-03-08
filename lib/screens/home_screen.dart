@@ -9,6 +9,7 @@ import 'package:besh_league/screens/about_screen.dart';
 import 'package:besh_league/screens/pre_game_screen.dart';
 import 'package:besh_league/screens/store_screen.dart';
 import 'package:besh_league/screens/inventory_screen.dart';
+import 'package:besh_league/screens/league_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 
@@ -1263,7 +1264,16 @@ Widget _buildLeftMenu(double width, double height) {
               child: _buildSquareMenuButton(Icons.storefront, const Color(0xFF6AE070), buttonSize),
             ),
             SizedBox(height: height * 0.02),
-            _buildSquareMenuButton(Icons.emoji_events, const Color(0xFFFFB74D), buttonSize),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => LeagueScreen(
+                  sessionTicket: widget.sessionTicket,
+                  playFabId: widget.playFabId,
+                )),
+              ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
+              child: _buildSquareMenuButton(Icons.emoji_events, const Color(0xFFFFB74D), buttonSize),
+            ),
             SizedBox(height: height * 0.02),
             GestureDetector(
               onTap: () => Navigator.push(

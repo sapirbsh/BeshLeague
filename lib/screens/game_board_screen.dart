@@ -39,6 +39,8 @@ class GameBoardScreen extends StatefulWidget {
 
 class _GameBoardScreenState extends State<GameBoardScreen>
     with TickerProviderStateMixin {
+  static const String _secretKey = "CFQN68J1MASXWCGM7A41RKY1KDIP1CDAQSOIMH6RA58WS9E19M";
+
   LiveGameService? _liveGameService;
   bool _isSimulation = false;
   bool get _isBotMatch => widget.botSkill != null;
@@ -100,7 +102,6 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   late AnimationController _rageController;
   late Animation<double> _rageShakeAnim;   // translateX shake
   late Animation<double> _rageFlipAnim;    // rotateX flip
-  late Animation<double> _rageScaleAnim;   // scale out
 
   late AnimationController _pulseController;
   late Animation<double> _pulseScale;
@@ -163,10 +164,6 @@ class _GameBoardScreenState extends State<GameBoardScreen>
       TweenSequenceItem(tween: ConstantTween(0.0), weight: 40),
       TweenSequenceItem(
           tween: Tween(begin: 0.0, end: -pi * 1.05), weight: 60),
-    ]).animate(_rageController);
-    _rageScaleAnim = TweenSequence<double>([
-      TweenSequenceItem(tween: ConstantTween(1.0), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.05), weight: 60),
     ]).animate(_rageController);
 
     // coin fly (win celebration)
@@ -778,13 +775,13 @@ class _GameBoardScreenState extends State<GameBoardScreen>
       }
 
       // XP: win = 50 base + streak bonus (5 per consecutive win, max +50)
-      //     loss = 25 base
+      //     loss = 0
       final isBoost = dailyGames < 5;
       final int streakBonus = iWon ? min(winStreak * 5, 50) : 0;
-      final int baseXp = iWon ? 50 : 25;
-      final int xpEarned = isBoost ? (baseXp + streakBonus) * 2 : (baseXp + streakBonus);
+      final int baseXp = iWon ? 50 : 0;
+      final int xpEarned = iWon ? (isBoost ? (baseXp + streakBonus) * 2 : (baseXp + streakBonus)) : 0;
       final newTotalXP = totalXp + xpEarned;
-      final newDailyGames = isBoost ? dailyGames + 1 : dailyGames;
+      final newDailyGames = (iWon && isBoost) ? dailyGames + 1 : dailyGames;
       final levelBefore = _levelFromTotalXP(totalXp);
       final levelAfter = _levelFromTotalXP(newTotalXP);
 
@@ -814,10 +811,18 @@ class _GameBoardScreenState extends State<GameBoardScreen>
 
       if (iWon) {
         await http.post(
-          Uri.parse('https://1A15A2.playfabapi.com/Client/AddUserVirtualCurrency'),
-          headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
-          body: json.encode({"VirtualCurrency": "CO", "Amount": widget.betAmount * 2}),
+          Uri.parse('https://1A15A2.playfabapi.com/Server/AddUserVirtualCurrency'),
+          headers: {'Content-Type': 'application/json', 'X-SecretKey': _secretKey},
+          body: json.encode({"PlayFabId": widget.myPlayFabId, "VirtualCurrency": "CO", "Amount": widget.betAmount * 2}),
         );
+      } else {
+        if (widget.betAmount > 0) {
+          await http.post(
+            Uri.parse('https://1A15A2.playfabapi.com/Server/SubtractUserVirtualCurrency'),
+            headers: {'Content-Type': 'application/json', 'X-SecretKey': _secretKey},
+            body: json.encode({"PlayFabId": widget.myPlayFabId, "VirtualCurrency": "CO", "Amount": widget.betAmount}),
+          );
+        }
       }
 
       if (mounted) {
@@ -1135,12 +1140,10 @@ class _GameBoardScreenState extends State<GameBoardScreen>
               return Transform.translate(
                 offset: Offset(_rageShakeAnim.value, 0),
                 child: Transform(
-                  alignment: Alignment.center,
+                  alignment: Alignment.bottomCenter,
                   transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.0015)
-                    ..rotateX(_rageFlipAnim.value)
-                    ..multiply(Matrix4.diagonal3Values(
-                        _rageScaleAnim.value, _rageScaleAnim.value, 1.0)),
+                    ..setEntry(3, 2, 0.001)
+                    ..rotateX(_rageFlipAnim.value),
                   child: child,
                 ),
               );
