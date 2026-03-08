@@ -30,6 +30,8 @@ class _LeagueScreenState extends State<LeagueScreen> {
   String? _ticketInstanceId;
   bool _isRegistered = false;
   int _coins = 0;
+  int _tkBalance = 0;         // פתקי הגרלה נוכחיים
+  bool _wasLeagueActive = false; // לזיהוי מחיקת ליגה
 
   Timer? _countdownTimer;
   Duration _timeUntilStart = Duration.zero;
@@ -120,14 +122,16 @@ class _LeagueScreenState extends State<LeagueScreen> {
         }
       }
 
-      // Parse inventory + coins
+      // Parse inventory + coins + TK
       bool hasTicket = false;
       String? ticketInstanceId;
       int fetchedCoins = 0;
+      int fetchedTk = 0;
       if (inventoryRes.statusCode == 200) {
         final data = json.decode(inventoryRes.body)['data'];
         final vc = data?['VirtualCurrency'] as Map<String, dynamic>? ?? {};
         fetchedCoins = vc['CO'] as int? ?? 0;
+        fetchedTk    = vc['TK'] as int? ?? 0;
 
         if (foundLeague != null) {
           final ticketItemId = foundLeague['ticketItemId']?.toString() ?? '';
@@ -158,14 +162,22 @@ class _LeagueScreenState extends State<LeagueScreen> {
         }
       }
 
+      // אם הליגה נמחקה (הייתה פעילה קודם ועכשיו נעלמה) — אפס פתקים
+      if (foundLeague == null && _wasLeagueActive) {
+        _resetTickets(fetchedTk);
+        fetchedTk = 0;
+      }
+
       if (!mounted) return;
       setState(() {
-        _activeLeague = foundLeague;
-        _hasTicket = hasTicket;
+        _activeLeague    = foundLeague;
+        _hasTicket       = hasTicket;
         _ticketInstanceId = ticketInstanceId;
-        _isRegistered = isRegistered;
-        _coins = fetchedCoins;
-        _isLoading = false;
+        _isRegistered    = isRegistered;
+        _coins           = fetchedCoins;
+        _tkBalance       = fetchedTk;
+        _wasLeagueActive = foundLeague != null;
+        _isLoading       = false;
       });
 
       if (foundLeague != null) {
@@ -191,6 +203,10 @@ class _LeagueScreenState extends State<LeagueScreen> {
     void tick() {
       if (!mounted) return;
       final diff = startDate.difference(DateTime.now().toUtc());
+      if (diff.isNegative && !_leagueStarted) {
+        // League just started — reset tickets once
+        _resetTickets(_tkBalance);
+      }
       setState(() {
         if (diff.isNegative) {
           _timeUntilStart = Duration.zero;
@@ -334,6 +350,18 @@ class _LeagueScreenState extends State<LeagueScreen> {
         _showSnack("שגיאת תקשורת.", Colors.redAccent);
       }
     }
+  }
+
+  Future<void> _resetTickets(int amount) async {
+    if (amount <= 0 || widget.sessionTicket.isEmpty) return;
+    try {
+      await http.post(
+        Uri.parse('https://$_titleId.playfabapi.com/Client/SubtractUserVirtualCurrency'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({"VirtualCurrency": "TK", "Amount": amount}),
+      );
+      if (mounted) setState(() => _tkBalance = 0);
+    } catch (_) {}
   }
 
   void _showSnack(String msg, Color color) {
