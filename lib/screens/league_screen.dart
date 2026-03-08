@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'package:besh_league/screens/store_screen.dart';
 
 class LeagueScreen extends StatefulWidget {
   final String sessionTicket;
@@ -22,9 +23,12 @@ class _LeagueScreenState extends State<LeagueScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isActioning = false;
 
   Map<String, dynamic>? _activeLeague;
   bool _hasTicket = false;
+  String? _ticketInstanceId;
+  bool _isRegistered = false;
   int _coins = 0;
 
   Timer? _countdownTimer;
@@ -67,23 +71,48 @@ class _LeagueScreenState extends State<LeagueScreen> {
           headers: headers,
           body: '{}',
         ),
+        http.post(
+          Uri.parse('https://$_titleId.playfabapi.com/Client/GetUserData'),
+          headers: headers,
+          body: json.encode({"Keys": ["LeagueRegistration"]}),
+        ),
       ]);
 
       final titleRes = results[0];
       final inventoryRes = results[1];
+      final userDataRes = results[2];
 
-      // Parse leagues
+      // Parse leagues — show 7 days before leagueStartDate
       Map<String, dynamic>? foundLeague;
       if (titleRes.statusCode == 200) {
         final raw = json.decode(titleRes.body)['data']?['Data']?['ActiveLeagues'];
+        debugPrint("ActiveLeagues raw: $raw");
         if (raw != null && raw.toString().isNotEmpty) {
           final List<dynamic> leagues = json.decode(raw.toString());
+          debugPrint("Leagues count: ${leagues.length}");
           final now = DateTime.now().toUtc();
+
           for (final league in leagues) {
+            final leagueStartStr = league['leagueStartDate']?.toString() ?? '';
             final saleDateStr = league['saleStartDate']?.toString() ?? '';
-            if (saleDateStr.isEmpty) continue;
-            final saleDate = DateTime.tryParse(saleDateStr)?.toUtc();
-            if (saleDate != null && !now.isBefore(saleDate)) {
+            debugPrint("League: ${league['name']} | leagueStart: $leagueStartStr | saleStart: $saleDateStr");
+
+            DateTime? visibilityDate;
+
+            // Use saleStartDate if explicitly set
+            if (saleDateStr.isNotEmpty) {
+              visibilityDate = DateTime.tryParse(saleDateStr)?.toUtc();
+            }
+            // Fallback: leagueStartDate - 7 days
+            if (visibilityDate == null && leagueStartStr.isNotEmpty) {
+              final leagueStart = DateTime.tryParse(leagueStartStr)?.toUtc();
+              if (leagueStart != null) {
+                visibilityDate = leagueStart.subtract(const Duration(days: 7));
+              }
+            }
+
+            // No date at all → always show
+            if (visibilityDate == null || !now.isBefore(visibilityDate)) {
               foundLeague = Map<String, dynamic>.from(league);
               break;
             }
@@ -93,6 +122,7 @@ class _LeagueScreenState extends State<LeagueScreen> {
 
       // Parse inventory + coins
       bool hasTicket = false;
+      String? ticketInstanceId;
       int fetchedCoins = 0;
       if (inventoryRes.statusCode == 200) {
         final data = json.decode(inventoryRes.body)['data'];
@@ -102,7 +132,29 @@ class _LeagueScreenState extends State<LeagueScreen> {
         if (foundLeague != null) {
           final ticketItemId = foundLeague['ticketItemId']?.toString() ?? '';
           final rawItems = data?['Inventory'] as List<dynamic>? ?? [];
-          hasTicket = rawItems.any((item) => item['ItemId']?.toString() == ticketItemId);
+          for (final item in rawItems) {
+            if (item['ItemId']?.toString() == ticketItemId) {
+              hasTicket = true;
+              ticketInstanceId = item['ItemInstanceId']?.toString();
+              break;
+            }
+          }
+        }
+      }
+
+      // Parse registration status
+      bool isRegistered = false;
+      if (userDataRes.statusCode == 200 && foundLeague != null) {
+        final userData = json.decode(userDataRes.body)['data']?['Data'];
+        final regRaw = userData?['LeagueRegistration']?['Value'];
+        if (regRaw != null) {
+          try {
+            final reg = json.decode(regRaw.toString());
+            if (reg['leagueId']?.toString() == foundLeague['leagueId']?.toString() &&
+                reg['registered'] == true) {
+              isRegistered = true;
+            }
+          } catch (_) {}
         }
       }
 
@@ -110,6 +162,8 @@ class _LeagueScreenState extends State<LeagueScreen> {
       setState(() {
         _activeLeague = foundLeague;
         _hasTicket = hasTicket;
+        _ticketInstanceId = ticketInstanceId;
+        _isRegistered = isRegistered;
         _coins = fetchedCoins;
         _isLoading = false;
       });
@@ -118,6 +172,7 @@ class _LeagueScreenState extends State<LeagueScreen> {
         _startCountdown(foundLeague['leagueStartDate']?.toString() ?? '');
       }
     } catch (e) {
+      debugPrint("League load error: $e");
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -130,14 +185,12 @@ class _LeagueScreenState extends State<LeagueScreen> {
   void _startCountdown(String leagueStartDateStr) {
     _countdownTimer?.cancel();
     if (leagueStartDateStr.isEmpty) return;
-
     final startDate = DateTime.tryParse(leagueStartDateStr)?.toUtc();
     if (startDate == null) return;
 
     void tick() {
       if (!mounted) return;
-      final now = DateTime.now().toUtc();
-      final diff = startDate.difference(now);
+      final diff = startDate.difference(DateTime.now().toUtc());
       setState(() {
         if (diff.isNegative) {
           _timeUntilStart = Duration.zero;
@@ -156,7 +209,7 @@ class _LeagueScreenState extends State<LeagueScreen> {
 
   Future<void> _purchaseTicket() async {
     final league = _activeLeague;
-    if (league == null) return;
+    if (league == null || _isActioning) return;
 
     final itemId = league['ticketItemId']?.toString() ?? '';
     final price = (league['price'] as num?)?.toInt() ?? 0;
@@ -166,15 +219,12 @@ class _LeagueScreenState extends State<LeagueScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isActioning = true);
 
     try {
       final res = await http.post(
         Uri.parse('https://$_titleId.playfabapi.com/Client/PurchaseItem'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Authorization': widget.sessionTicket,
-        },
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
         body: json.encode({
           "CatalogVersion": "Main",
           "ItemId": itemId,
@@ -186,30 +236,101 @@ class _LeagueScreenState extends State<LeagueScreen> {
       if (!mounted) return;
 
       if (res.statusCode == 200) {
-        setState(() {
-          _coins -= price;
-          _hasTicket = true;
-          _isLoading = false;
-        });
-        _showSnack("הכרטיס נרכש בהצלחה! נרשמת לליגה 🎉", Colors.green);
+        // Reload to get ItemInstanceId
+        await _loadData();
+        _showSnack("הכרטיס נרכש! עכשיו לחץ הירשם כדי להצטרף לליגה 🎉", Colors.green);
       } else {
-        setState(() => _isLoading = false);
-        final errorData = json.decode(res.body);
-        final errorMsg = errorData['errorMessage']?.toString() ?? '';
-        final errorType = errorData['error']?.toString() ?? '';
-
-        if (errorMsg.contains('InsufficientFunds') || errorMsg.contains('insufficient')) {
-          _showSnack("אין לך מספיק מטבעות לרכישה.", Colors.redAccent);
-        } else if (errorMsg.contains('already') || errorMsg.contains('owned') || errorType == 'ItemAlreadyOwned') {
-          setState(() => _hasTicket = true);
+        setState(() => _isActioning = false);
+        final err = json.decode(res.body);
+        final msg = err['errorMessage']?.toString() ?? '';
+        final type = err['error']?.toString() ?? '';
+        if (msg.contains('InsufficientFunds') || msg.contains('insufficient')) {
+          _showSnack("אין לך מספיק מטבעות.", Colors.redAccent);
+        } else if (msg.contains('already') || msg.contains('owned') || type == 'ItemAlreadyOwned') {
+          await _loadData();
           _showSnack("כבר יש לך כרטיס לליגה הזו!", Colors.orange);
         } else {
-          _showSnack("שגיאת שרת: $errorType - $errorMsg", Colors.redAccent);
+          _showSnack("שגיאת רכישה: $type - $msg", Colors.redAccent);
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isActioning = false);
+        _showSnack("שגיאת תקשורת.", Colors.redAccent);
+      }
+    }
+  }
+
+  Future<void> _registerForLeague() async {
+    final league = _activeLeague;
+    if (league == null || _isActioning || !_hasTicket) return;
+    if (_ticketInstanceId == null) {
+      _showSnack("שגיאה: לא נמצא מזהה כרטיס. נסה לרענן.", Colors.redAccent);
+      return;
+    }
+
+    setState(() => _isActioning = true);
+
+    try {
+      // 1. Consume the ticket from inventory
+      final consumeRes = await http.post(
+        Uri.parse('https://$_titleId.playfabapi.com/Client/ConsumeItem'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({
+          "ItemInstanceId": _ticketInstanceId,
+          "ConsumeCount": 1,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (consumeRes.statusCode != 200) {
+        setState(() => _isActioning = false);
+        final err = json.decode(consumeRes.body);
+        _showSnack("שגיאה: ${err['errorMessage'] ?? 'לא ניתן לצרוך כרטיס'}", Colors.redAccent);
+        return;
+      }
+
+      // 2. Increment participants + save registration via CloudScript
+      await http.post(
+        Uri.parse('https://$_titleId.playfabapi.com/Client/ExecuteCloudScript'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({
+          "FunctionName": "RegisterForLeague",
+          "FunctionParameter": {"leagueId": league['leagueId']?.toString()},
+        }),
+      );
+
+      // 3. Save registration locally in UserData as backup
+      await http.post(
+        Uri.parse('https://$_titleId.playfabapi.com/Client/UpdateUserData'),
+        headers: {'Content-Type': 'application/json', 'X-Authorization': widget.sessionTicket},
+        body: json.encode({
+          "Data": {
+            "LeagueRegistration": json.encode({
+              "leagueId": league['leagueId']?.toString(),
+              "registered": true,
+            })
+          }
+        }),
+      );
+
+      if (!mounted) return;
+
+      // Update local state — increment participant count
+      final current = (league['currentParticipants'] as num?)?.toInt() ?? 0;
+      setState(() {
+        _hasTicket = false;
+        _ticketInstanceId = null;
+        _isRegistered = true;
+        _isActioning = false;
+        _activeLeague = {...league, 'currentParticipants': current + 1};
+      });
+
+      _showSnack("נרשמת לליגה בהצלחה! 🏆", Colors.green);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isActioning = false);
         _showSnack("שגיאת תקשורת.", Colors.redAccent);
       }
     }
@@ -220,20 +341,9 @@ class _LeagueScreenState extends State<LeagueScreen> {
       SnackBar(
         content: Text(msg, textAlign: TextAlign.right),
         backgroundColor: color,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 4),
       ),
     );
-  }
-
-  String _formatCountdown(Duration d) {
-    final days = d.inDays;
-    final hours = d.inHours.remainder(24);
-    final minutes = d.inMinutes.remainder(60);
-    final seconds = d.inSeconds.remainder(60);
-    if (days > 0) return "$days ימים, $hours שעות, $minutes דקות, $seconds שניות";
-    if (hours > 0) return "$hours שעות, $minutes דקות, $seconds שניות";
-    if (minutes > 0) return "$minutes דקות, $seconds שניות";
-    return "$seconds שניות";
   }
 
   @override
@@ -248,15 +358,19 @@ class _LeagueScreenState extends State<LeagueScreen> {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (context, error, stack) =>
-                  Container(color: const Color(0xFF0A192F)),
+              errorBuilder: (c, e, s) => Container(color: const Color(0xFF0A192F)),
             ),
             SafeArea(
-              child: Column(
-                children: [
-                  _buildTopBar(context),
-                  Expanded(child: _buildBody()),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Row(
+                    children: [
+                      _buildLeftSidebar(constraints.maxHeight),
+                      Expanded(child: _buildMainContent()),
+                      _buildRightInfoPanel(constraints.maxHeight),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -265,47 +379,59 @@ class _LeagueScreenState extends State<LeagueScreen> {
     );
   }
 
-  Widget _buildTopBar(BuildContext context) {
+  // ─── LEFT SIDEBAR ──────────────────────────────────────────────────────────
+
+  Widget _buildLeftSidebar(double height) {
+    final btnSize = (height * 0.11).clamp(52.0, 80.0);
     return Container(
-      color: Colors.black.withValues(alpha: 0.7),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+      width: btnSize + 20,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          const SizedBox(width: 12),
-          const Icon(Icons.emoji_events, color: Colors.amber, size: 28),
-          const SizedBox(width: 8),
+          // Title
           const Text(
             "ליגות",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const Spacer(),
-          Row(children: [
-            const Icon(Icons.monetization_on, color: Colors.amber, size: 22),
-            const SizedBox(width: 4),
-            Text(
-              "$_coins",
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ]),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70, size: 22),
-            onPressed: _loadData,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
+          const SizedBox(height: 20),
+          // Home button
+          _sideBtn(Icons.home, Colors.blueGrey, btnSize, () => Navigator.pop(context)),
+          SizedBox(height: height * 0.025),
+          // Store button
+          _sideBtn(Icons.storefront, const Color(0xFF6AE070), btnSize, () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => StoreScreen(sessionTicket: widget.sessionTicket),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _sideBtn(IconData icon, Color color, double size, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.black, width: 2),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))],
+        ),
+        child: Icon(icon, size: size * 0.5, color: Colors.black),
+      ),
+    );
+  }
+
+  // ─── MAIN CONTENT ──────────────────────────────────────────────────────────
+
+  Widget _buildMainContent() {
     if (_isLoading) {
       return const Center(
         child: Column(
@@ -326,7 +452,7 @@ class _LeagueScreenState extends State<LeagueScreen> {
           children: [
             const Icon(Icons.error_outline, color: Colors.redAccent, size: 50),
             const SizedBox(height: 12),
-            Text(_errorMessage!, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+            Text(_errorMessage!, style: const TextStyle(color: Colors.white70, fontSize: 15)),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
@@ -340,112 +466,41 @@ class _LeagueScreenState extends State<LeagueScreen> {
     }
 
     if (_activeLeague == null) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock, color: Colors.white24, size: 80),
-            SizedBox(height: 20),
-            Text(
-              "אין ליגות פעילות כרגע",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text(
-              "בדוק שוב מאוחר יותר",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white38, fontSize: 15),
-            ),
-          ],
-        ),
-      );
+      return _buildLockedState();
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 700;
-        if (isWide) {
-          return Row(
-            children: [
-              Expanded(child: _buildInfoPanel()),
-              Expanded(child: _buildLeagueCard()),
-            ],
-          );
-        }
-        return SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildLeagueCard(),
-              _buildInfoPanel(),
-            ],
-          ),
-        );
-      },
-    );
+    return _buildLeagueCard();
   }
 
-  Widget _buildInfoPanel() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
+  Widget _buildLockedState() {
+    return Center(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            "מה זה ליגת בש?",
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.amber,
+          Container(
+            width: 170,
+            height: 170,
+            decoration: BoxDecoration(
+              color: Colors.black38,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white12, width: 2),
             ),
+            child: const Icon(Icons.lock, color: Colors.white24, size: 80),
           ),
-          const SizedBox(height: 16),
-          _infoItem(Icons.emoji_events, "תחרות מרובת שחקנים",
-              "התמודד מול שחקנים אחרים בטורניר מסודר עם פרסים מובטחים."),
-          const SizedBox(height: 12),
-          _infoItem(Icons.confirmation_number, "כרטיס כניסה",
-              "כדי להצטרף לליגה תצטרך לרכוש כרטיס כניסה במטבעות שלך."),
-          const SizedBox(height: 12),
-          _infoItem(Icons.leaderboard, "טבלת דירוג",
-              "כל ניצחון מוסיף נקודות. בסיום הליגה, המקומות הגבוהים זוכים בפרסים!"),
-          const SizedBox(height: 12),
-          _infoItem(Icons.timer, "ספירה לאחור",
-              "הליגה תתחיל בתאריך קבוע. הצטרף לפני שהכרטיסים אוזלים."),
+          const SizedBox(height: 20),
+          const Text(
+            "אין ליגות פעילות כרגע",
+            style: TextStyle(color: Colors.white54, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text("בדוק שוב בקרוב", style: TextStyle(color: Colors.white38, fontSize: 14)),
+          const SizedBox(height: 20),
+          IconButton(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh, color: Colors.white38, size: 28),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _infoItem(IconData icon, String title, String desc) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.amber.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: Colors.amber, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 3),
-              Text(desc,
-                  style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.4)),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
@@ -455,181 +510,356 @@ class _LeagueScreenState extends State<LeagueScreen> {
     final current = (league['currentParticipants'] as num?)?.toInt() ?? 0;
     final max = (league['maxParticipants'] as num?)?.toInt() ?? 0;
     final price = (league['price'] as num?)?.toInt() ?? 0;
-    final fillRatio = max > 0 ? current / max : 0.0;
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1A2A4A), Color(0xFF0D1B2A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    final ticketOwned = _hasTicket || _isRegistered;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 360),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1A2A4A), Color(0xFF0D1B2A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.5), width: 2),
+            boxShadow: [
+              BoxShadow(color: Colors.amber.withValues(alpha: 0.2), blurRadius: 24, spreadRadius: 2),
+            ],
           ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.amber.withValues(alpha: 0.5), width: 2),
-          boxShadow: [
-            BoxShadow(color: Colors.amber.withValues(alpha: 0.15), blurRadius: 20, spreadRadius: 2),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Trophy icon
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.amber.withValues(alpha: 0.3), Colors.orange.withValues(alpha: 0.1)],
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // League name
+                Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
                   ),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.5), width: 1.5),
                 ),
-                child: const Icon(Icons.emoji_events, color: Colors.amber, size: 48),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
-              // League name
-              Text(
-                name,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
+                // Trophy
+                const Icon(Icons.emoji_events, color: Colors.amber, size: 56),
+                const SizedBox(height: 16),
+
+                // Participants
+                Text(
+                  "משתתפים - $current",
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Participants
-              Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("משתתפים",
-                          style: TextStyle(color: Colors.white54, fontSize: 13)),
-                      Text(
-                        "$current / $max",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: fillRatio.clamp(0.0, 1.0),
-                      minHeight: 8,
-                      backgroundColor: Colors.white12,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        fillRatio >= 0.9 ? Colors.redAccent : Colors.amber,
-                      ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: max > 0 ? (current / max).clamp(0.0, 1.0) : 0,
+                    minHeight: 8,
+                    backgroundColor: Colors.white12,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      current >= max ? Colors.redAccent : Colors.amber,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Countdown
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white12),
                 ),
-                child: Column(
+                const SizedBox(height: 18),
+
+                // Countdown
+                _buildCountdown(),
+                const SizedBox(height: 18),
+
+                // Register / Buy button
+                _buildActionButton(price),
+                const SizedBox(height: 8),
+
+                // Ticket indicator
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      _leagueStarted ? "הליגה החלה!" : "מתחיל בעוד:",
-                      style: TextStyle(
-                        color: _leagueStarted ? Colors.greenAccent : Colors.white54,
-                        fontSize: 13,
-                      ),
+                    Icon(
+                      Icons.confirmation_number,
+                      size: 14,
+                      color: ticketOwned ? Colors.amber : Colors.white30,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(width: 4),
                     Text(
-                      _leagueStarted
-                          ? "🏆 בהצלחה!"
-                          : _formatCountdown(_timeUntilStart),
-                      textAlign: TextAlign.center,
+                      "כרטיסים ${ticketOwned ? 1 : 0}/1",
                       style: TextStyle(
-                        color: _leagueStarted ? Colors.greenAccent : Colors.amber,
-                        fontSize: _leagueStarted ? 18 : 16,
+                        color: ticketOwned ? Colors.amber : Colors.white30,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Action button
-              _buildActionButton(price),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  Widget _buildCountdown() {
+    if (_leagueStarted) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
+        ),
+        child: const Text(
+          "הליגה החלה! 🏆",
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.greenAccent, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    final days = _timeUntilStart.inDays;
+    final hours = _timeUntilStart.inHours.remainder(24);
+    final minutes = _timeUntilStart.inMinutes.remainder(60);
+    final seconds = _timeUntilStart.inSeconds.remainder(60);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          const Text("מתחיל בעוד:", style: TextStyle(color: Colors.white54, fontSize: 12)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _countUnit(days, "ימים"),
+              _sep(),
+              _countUnit(hours, "שעות"),
+              _sep(),
+              _countUnit(minutes, "דקות"),
+              _sep(),
+              _countUnit(seconds, "שניות"),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _countUnit(int value, String label) {
+    return Column(
+      children: [
+        Text(
+          value.toString().padLeft(2, '0'),
+          style: const TextStyle(
+            color: Colors.amber,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+      ],
+    );
+  }
+
+  Widget _sep() =>
+      const Text(":", style: TextStyle(color: Colors.amber, fontSize: 22, fontWeight: FontWeight.bold));
+
   Widget _buildActionButton(int price) {
-    if (_hasTicket) {
+    // Already registered
+    if (_isRegistered) {
       return SizedBox(
         width: double.infinity,
-        height: 48,
+        height: 46,
         child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
-            backgroundColor: _leagueStarted ? const Color(0xFF2E7D32) : const Color(0xFF1B5E20),
+            backgroundColor: _leagueStarted ? Colors.green : Colors.green.withValues(alpha: 0.55),
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            elevation: _leagueStarted ? 4 : 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(23)),
           ),
           onPressed: _leagueStarted
-              ? () {
-                  // TODO: navigate to league game
-                  _showSnack("הליגה מתחילה! 🚀", Colors.green);
-                }
+              ? () => _showSnack("הליגה מתחילה! 🚀", Colors.green)
               : null,
-          icon: Icon(
-            _leagueStarted ? Icons.play_arrow_rounded : Icons.check_circle,
-            size: 22,
-          ),
+          icon: Icon(_leagueStarted ? Icons.play_arrow_rounded : Icons.check_circle, size: 22),
           label: Text(
-            _leagueStarted ? "כנס לליגה!" : "נרשמת לליגה בהצלחה!",
+            _leagueStarted ? "כנס לליגה!" : "הירשם",
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
       );
     }
 
+    // Has ticket — register (consume)
+    if (_hasTicket) {
+      return SizedBox(
+        width: double.infinity,
+        height: 46,
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF28559A),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(23)),
+          ),
+          onPressed: _isActioning ? null : _registerForLeague,
+          icon: _isActioning
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : const Icon(Icons.how_to_reg, size: 22),
+          label: const Text("הירשם", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        ),
+      );
+    }
+
+    // No ticket — buy
     return SizedBox(
       width: double.infinity,
-      height: 48,
+      height: 46,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFF59F00),
           foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(23)),
         ),
-        onPressed: _purchaseTicket,
-        icon: const Icon(Icons.confirmation_number, size: 22),
+        onPressed: _isActioning ? null : _purchaseTicket,
+        icon: _isActioning
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+            : const Icon(Icons.confirmation_number, size: 22),
         label: Text(
           "קנה כרטיס ($price מטבעות)",
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
       ),
     );
   }
+
+  // ─── RIGHT INFO PANEL ──────────────────────────────────────────────────────
+
+  Widget _buildRightInfoPanel(double height) {
+    return Container(
+      width: (height * 0.3).clamp(160.0, 240.0),
+      margin: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 12, 12, 6),
+            child: Text(
+              "מידע על הליגה",
+              style: TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          const Expanded(
+            child: _InfoPageView(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── INFO PAGE VIEW ─────────────────────────────────────────────────────────
+
+class _InfoPageView extends StatefulWidget {
+  const _InfoPageView();
+
+  @override
+  State<_InfoPageView> createState() => _InfoPageViewState();
+}
+
+class _InfoPageViewState extends State<_InfoPageView> {
+  final _controller = PageController();
+  int _page = 0;
+
+  static const _pages = [
+    _InfoData(Icons.emoji_events, "ליגת בש", "תחרות מרובת שחקנים עם פרסים ממשיים לזוכים. כל חודש ליגה חדשה!"),
+    _InfoData(Icons.confirmation_number, "כרטיס כניסה", "רכוש כרטיס כניסה, לחץ הירשם. הכרטיס ייצרך ותירשם לליגה אוטומטית."),
+    _InfoData(Icons.leaderboard, "טבלת דירוג", "כל ניצחון מוסיף נקודות לדירוג. בסיום הליגה הזוכים מקבלים פרסים אמיתיים!"),
+    _InfoData(Icons.timer, "ספירה לאחור", "הליגה תתחיל בתאריך קבוע. הצטרף לפני שהכרטיסים אוזלים."),
+  ];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: _pages.length,
+            onPageChanged: (i) => setState(() => _page = i),
+            itemBuilder: (context, i) {
+              final p = _pages[i];
+              return Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(p.icon, color: Colors.amber, size: 32),
+                    const SizedBox(height: 10),
+                    Text(p.title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text(p.body,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.5)),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        // Page dots
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              _pages.length,
+              (i) => AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: _page == i ? 18 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: _page == i ? Colors.amber : Colors.white24,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoData {
+  final IconData icon;
+  final String title;
+  final String body;
+  const _InfoData(this.icon, this.title, this.body);
 }
