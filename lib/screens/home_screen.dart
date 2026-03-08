@@ -10,6 +10,8 @@ import 'package:besh_league/screens/pre_game_screen.dart';
 import 'package:besh_league/screens/store_screen.dart';
 import 'package:besh_league/screens/inventory_screen.dart';
 import 'package:besh_league/screens/league_screen.dart';
+import 'package:besh_league/screens/multi_table_screen.dart';
+import 'package:besh_league/screens/spin_wheel_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 
@@ -993,6 +995,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             alignment: const Alignment(0.0, -0.6),
                             child: SizedBox(width: width * 0.45, child: _buildCenterProfile(width, height))
                           ),
+                          // כפתור גלגל המזל - בנר בולט במרכז למטה
+                          Align(
+                            alignment: const Alignment(0.0, 0.85),
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SpinWheelScreen(sessionTicket: widget.sessionTicket, playFabId: widget.playFabId))).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0.97, end: 1.03),
+                                duration: const Duration(milliseconds: 900),
+                                builder: (ctx, scale, child) => Transform.scale(scale: scale, child: child),
+                                child: Container(
+                                  width: width * 0.38,
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(colors: [Color(0xFFB8860B), Color(0xFFFFD700), Color(0xFFB8860B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(color: Colors.white, width: 2),
+                                    boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.7), blurRadius: 18, spreadRadius: 2)],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text('🎰', style: TextStyle(fontSize: 28)),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Text('גלגל המזל', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                          Text('5 סיבובים חינם ביום!', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                           // כפתור חברים (מוצג כשהפאנל סגור)
                           if (!_isFriendsPanelOpen)
                             Positioned(
@@ -1281,6 +1320,58 @@ Widget _buildLeftMenu(double width, double height) {
                 MaterialPageRoute(builder: (context) => InventoryScreen(sessionTicket: widget.sessionTicket)),
               ),
               child: _buildSquareMenuButton(Icons.inventory_2, const Color(0xFF64B5F6), buttonSize),
+            ),
+            SizedBox(height: height * 0.02),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MultiTableScreen(
+                    sessionTicket: widget.sessionTicket,
+                    myPlayFabId: widget.playFabId,
+                    myName: playfabUsername,
+                    myTrophies: trophies,
+                    loadFromServer: true,
+                  ),
+                ),
+              ),
+              child: _buildSquareMenuButton(Icons.table_chart, const Color(0xFF9C7BEA), buttonSize),
+            ),
+            SizedBox(height: height * 0.02),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SpinWheelScreen(
+                    sessionTicket: widget.sessionTicket,
+                    playFabId: widget.playFabId,
+                  ),
+                ),
+              ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _buildSquareMenuButton(Icons.casino, const Color(0xFFFFD700), buttonSize),
+                  Positioned(
+                    top: -4,
+                    left: -4,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.8, end: 1.2),
+                      duration: const Duration(milliseconds: 700),
+                      curve: Curves.easeInOut,
+                      builder: (ctx, scale, child) => Transform.scale(scale: scale, child: child),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Text('★', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
