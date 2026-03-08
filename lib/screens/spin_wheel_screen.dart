@@ -61,9 +61,10 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
 
   final StreamController<int> _wheelController = StreamController<int>();
 
-  bool _isSpinning  = false;
-  bool _isLoading   = true;
-  int  _spinsToday  = 0;
+  bool _isSpinning     = false;
+  bool _isLoading      = true;
+  int  _spinsAvailable = 0;   // spins in bank (watch ad to earn, spend to spin)
+  int  _adsWatched     = 0;   // total ads watched today (cap = _maxDailySpins)
   String _monthlyWinner = '';
   int  _selectedIndex = 0;
 
@@ -71,7 +72,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   late AnimationController _glowController;
   late Animation<double> _glowAnim;
 
-  int get _spinsRemaining => (_maxDailySpins - _spinsToday).clamp(0, _maxDailySpins);
+  bool get _canEarnMore => _adsWatched < _maxDailySpins;
 
   @override
   void initState() {
@@ -133,10 +134,11 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
       final userData  = json.decode(results[0].body)['data']?['Data'];
       final titleData = json.decode(results[1].body)['data']?['Data'];
 
-      final today     = _todayUtc();
-      final lastDate  = userData?['LastSpinDate']?['Value'] ?? '';
-      int spinsToday  = int.tryParse(userData?['SpinsToday']?['Value'] ?? '0') ?? 0;
-      if (lastDate != today) spinsToday = 0; // reset on new day
+      final today    = _todayUtc();
+      final lastDate = userData?['LastSpinDate']?['Value'] ?? '';
+      // Reset on new day
+      int adsWatched     = lastDate == today ? (int.tryParse(userData?['AdsWatched']?['Value']     ?? '0') ?? 0) : 0;
+      int spinsAvailable = lastDate == today ? (int.tryParse(userData?['SpinsAvailable']?['Value'] ?? '0') ?? 0) : 0;
 
       // Monthly winner can be a JSON object or plain string
       String winner = '';
@@ -151,9 +153,10 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
       }
 
       setState(() {
-        _spinsToday    = spinsToday;
-        _monthlyWinner = winner;
-        _isLoading     = false;
+        _adsWatched     = adsWatched;
+        _spinsAvailable = spinsAvailable;
+        _monthlyWinner  = winner;
+        _isLoading      = false;
       });
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -163,7 +166,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   // ─── Spin logic ───────────────────────────────────────────────────────────
 
   void _spin() {
-    if (_isSpinning || _spinsRemaining <= 0) return;
+    if (_isSpinning || _spinsAvailable <= 0) return;
     final result = _weightedRandom();
     setState(() {
       _isSpinning    = true;
@@ -173,18 +176,18 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   }
 
   Future<void> _onAnimationEnd() async {
-    final prize   = _prizes[_selectedIndex];
-    final today   = _todayUtc();
-    final newCount = _spinsToday + 1;
+    final prize = _prizes[_selectedIndex];
+    final today = _todayUtc();
+    final newAvailable = _spinsAvailable - 1;
 
     // Fire-and-forget PlayFab calls
     _awardPrize(prize);
-    _saveSpinData(today, newCount);
+    _saveSpinData(today, _adsWatched, newAvailable);
 
     if (!mounted) return;
     setState(() {
-      _isSpinning = false;
-      _spinsToday = newCount;
+      _isSpinning     = false;
+      _spinsAvailable = newAvailable;
     });
     _showPrizeDialog(prize);
   }
@@ -213,7 +216,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     } catch (_) {}
   }
 
-  Future<void> _saveSpinData(String date, int count) async {
+  Future<void> _saveSpinData(String date, int adsWatched, int spinsAvailable) async {
     if (widget.sessionTicket.isEmpty) return;
     try {
       await http.post(
@@ -224,8 +227,9 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
         },
         body: json.encode({
           "Data": {
-            "LastSpinDate": date,
-            "SpinsToday": "$count",
+            "LastSpinDate":    date,
+            "AdsWatched":      "$adsWatched",
+            "SpinsAvailable":  "$spinsAvailable",
           }
         }),
       );
@@ -233,23 +237,22 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   }
 
   void _watchAdForSpin() {
-    // Integrate AdMob / Unity Ads here; on success call _addBonusSpin()
-    // For now shows a placeholder snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('תכונת הסרטון תהיה זמינה בקרוב!', textAlign: TextAlign.right),
-        backgroundColor: Colors.orange,
-        action: SnackBarAction(
-          label: 'בדוק',
-          textColor: Colors.white,
-          onPressed: _addBonusSpin,
-        ),
-      ),
-    );
+    if (!_canEarnMore || _isSpinning) return;
+    // TODO: Integrate AdMob / Unity Ads here; call _onAdCompleted() on success
+    // Simulating ad completion for now:
+    _onAdCompleted();
   }
 
-  void _addBonusSpin() {
-    setState(() => _spinsToday = (_spinsToday - 1).clamp(0, _maxDailySpins));
+  void _onAdCompleted() {
+    if (!_canEarnMore) return;
+    final today       = _todayUtc();
+    final newAds      = _adsWatched + 1;
+    final newAvailable = _spinsAvailable + 1;
+    setState(() {
+      _adsWatched     = newAds;
+      _spinsAvailable = newAvailable;
+    });
+    _saveSpinData(today, newAds, newAvailable);
   }
 
   // ─── Dialogs ──────────────────────────────────────────────────────────────
@@ -441,11 +444,14 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                   ? const Center(
                       child: CircularProgressIndicator(color: Colors.amber),
                     )
-                  : Column(
+                  : Stack(
                       children: [
-                        _buildHeader(),
-                        Expanded(child: _buildWheel()),
-                        _buildBottomSection(),
+                        // Wheel fills entire area
+                        Positioned.fill(child: _buildWheel()),
+                        // Header overlaid on top
+                        Positioned(top: 0, left: 0, right: 0, child: _buildHeader()),
+                        // Controls overlaid at bottom
+                        Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomSection()),
                       ],
                     ),
             ),
@@ -534,9 +540,13 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   Widget _buildWheel() {
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        final size = min(constraints.maxWidth, constraints.maxHeight) - 32;
+        // Leave room for header (~80px) and bottom controls (~130px)
+        final availableH = constraints.maxHeight - 210;
+        final size = min(constraints.maxWidth - 16, availableH.clamp(100.0, constraints.maxHeight)).toDouble();
         return Center(
-          child: SizedBox(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 80, bottom: 130),
+            child: SizedBox(
             width: size,
             height: size,
             child: FortuneWheel(
@@ -579,6 +589,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                   ),
               ],
             ),
+            ),
           ),
         );
       },
@@ -588,130 +599,99 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   // ─── Bottom Controls ──────────────────────────────────────────────────────
 
   Widget _buildBottomSection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+    final canSpin = !_isSpinning && _spinsAvailable > 0;
+    final canWatch = !_isSpinning && _canEarnMore;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Remaining spins row
+          // Spins available + dot indicators in one row
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                'סיבובים נותרים היום: ',
-                style: TextStyle(color: Colors.white70, fontSize: 15),
-              ),
               Text(
-                '$_spinsRemaining',
+                'סיבובים: $_spinsAvailable  ',
                 style: TextStyle(
-                  color: _spinsRemaining > 0 ? Colors.greenAccent : Colors.redAccent,
-                  fontSize: 20,
+                  color: _spinsAvailable > 0 ? Colors.greenAccent : Colors.white38,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              ...List.generate(_maxDailySpins, (i) => AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 10,
+                height: 10,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i < _adsWatched ? Colors.amber : Colors.white24,
+                  boxShadow: i < _adsWatched
+                      ? [const BoxShadow(color: Colors.amber, blurRadius: 5)]
+                      : null,
+                ),
+              )),
               Text(
-                ' / $_maxDailySpins',
-                style: const TextStyle(color: Colors.white38, fontSize: 15),
+                '  $_adsWatched/$_maxDailySpins פרסומות',
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // Dot indicators
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              _maxDailySpins,
-              (i) => AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: 13,
-                height: 13,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: i < _spinsRemaining
-                      ? Colors.greenAccent
-                      : Colors.white24,
-                  boxShadow: i < _spinsRemaining
-                      ? [const BoxShadow(color: Colors.greenAccent, blurRadius: 6)]
-                      : null,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           // Spin button
           AnimatedBuilder(
             animation: _glowAnim,
-            builder: (ctx, child) {
-              final canSpin = !_isSpinning && _spinsRemaining > 0;
-              return Container(
-                width: double.infinity,
-                height: 56,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: canSpin
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFFFFD700)
-                                .withValues(alpha: _glowAnim.value * 0.7),
-                            blurRadius: 20,
-                            spreadRadius: 4,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: child,
-              );
-            },
+            builder: (ctx, child) => Container(
+              width: double.infinity,
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: canSpin
+                    ? [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: _glowAnim.value * 0.7), blurRadius: 18, spreadRadius: 3)]
+                    : null,
+              ),
+              child: child,
+            ),
             child: SizedBox(
               width: double.infinity,
-              height: 56,
+              height: 50,
               child: ElevatedButton(
-                onPressed: (_isSpinning || _spinsRemaining <= 0) ? null : _spin,
+                onPressed: canSpin ? _spin : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFD700),
                   disabledBackgroundColor: Colors.white12,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 0,
                 ),
                 child: _isSpinning
-                    ? const SizedBox(
-                        width: 26,
-                        height: 26,
-                        child: CircularProgressIndicator(
-                          color: Colors.black54,
-                          strokeWidth: 3,
-                        ),
-                      )
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.black54, strokeWidth: 3))
                     : Text(
-                        _spinsRemaining > 0 ? '🎰  סובב עכשיו!' : 'חזור מחר לסיבובים נוספים',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          color: _spinsRemaining > 0 ? Colors.black : Colors.white38,
-                        ),
+                        canSpin ? '🎰  סובב עכשיו!' : (_spinsAvailable == 0 ? 'צפה בפרסומת לסיבוב' : 'צפה בפרסומת'),
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: canSpin ? Colors.black : Colors.white38),
                       ),
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          // Watch video button
+          const SizedBox(height: 8),
+          // Watch ad button
           SizedBox(
             width: double.infinity,
-            height: 44,
+            height: 40,
             child: OutlinedButton.icon(
-              onPressed: _isSpinning ? null : _watchAdForSpin,
-              icon: const Icon(Icons.ondemand_video, size: 18),
-              label: const Text('צפה בסרטון לסיבוב נוסף'),
+              onPressed: canWatch ? _watchAdForSpin : null,
+              icon: Icon(Icons.ondemand_video, size: 16, color: canWatch ? Colors.amber : Colors.white24),
+              label: Text(
+                _canEarnMore ? 'צפה בפרסומת לקבלת סיבוב' : 'הגעת למקסימום סיבובים היום',
+                style: TextStyle(fontSize: 13, color: canWatch ? Colors.amber : Colors.white24),
+              ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.amber,
-                disabledForegroundColor: Colors.white24,
-                side: BorderSide(
-                  color: _isSpinning ? Colors.white12 : Colors.amber.withValues(alpha: 0.6),
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                side: BorderSide(color: canWatch ? Colors.amber.withValues(alpha: 0.6) : Colors.white12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),

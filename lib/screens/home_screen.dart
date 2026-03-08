@@ -995,43 +995,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             alignment: const Alignment(0.0, -0.6),
                             child: SizedBox(width: width * 0.45, child: _buildCenterProfile(width, height))
                           ),
-                          // כפתור גלגל המזל - בנר בולט במרכז למטה
-                          Align(
-                            alignment: const Alignment(0.0, 0.85),
-                            child: GestureDetector(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SpinWheelScreen(sessionTicket: widget.sessionTicket, playFabId: widget.playFabId))).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
-                              child: TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 0.97, end: 1.03),
-                                duration: const Duration(milliseconds: 900),
-                                builder: (ctx, scale, child) => Transform.scale(scale: scale, child: child),
-                                child: Container(
-                                  width: width * 0.38,
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(colors: [Color(0xFFB8860B), Color(0xFFFFD700), Color(0xFFB8860B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(color: Colors.white, width: 2),
-                                    boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.7), blurRadius: 18, spreadRadius: 2)],
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Text('🎰', style: TextStyle(fontSize: 28)),
-                                      const SizedBox(width: 10),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: const [
-                                          Text('גלגל המזל', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87)),
-                                          Text('5 סיבובים חינם ביום!', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
                           // כפתור חברים (מוצג כשהפאנל סגור)
                           if (!_isFriendsPanelOpen)
                             Positioned(
