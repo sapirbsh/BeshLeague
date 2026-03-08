@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:besh_league/screens/auth_screen.dart';
 import 'package:besh_league/screens/home_screen.dart';
 
@@ -39,10 +39,11 @@ class _SplashScreenState extends State<SplashScreen> {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final identifier = prefs.getString('loginIdentifier');
-    final password   = prefs.getString('loginPassword');
-    final isEmail    = prefs.getBool('loginIsEmail') ?? false;
+    const storage    = FlutterSecureStorage();
+    final identifier = await storage.read(key: 'loginIdentifier');
+    final password   = await storage.read(key: 'loginPassword');
+    final isEmailStr = await storage.read(key: 'loginIsEmail');
+    final isEmail    = isEmailStr == 'true';
 
     // ניסיון Silent Login — מתחבר מחדש לשרת כדי לקבל Ticket טרי
     if (identifier != null && identifier.isNotEmpty &&
@@ -67,12 +68,12 @@ class _SplashScreenState extends State<SplashScreen> {
         if (!mounted) return;
 
         if (response.statusCode == 200) {
-          final data       = json.decode(response.body)['data'];
-          final newTicket  = data['SessionTicket'] as String;
-          final newPfId    = data['PlayFabId']     as String;
+          final data      = json.decode(response.body)['data'];
+          final newTicket = data['SessionTicket'] as String;
+          final newPfId   = data['PlayFabId']     as String;
 
-          await prefs.setString('sessionTicket', newTicket);
-          await prefs.setString('playFabId',     newPfId);
+          await storage.write(key: 'sessionTicket', value: newTicket);
+          await storage.write(key: 'playFabId',     value: newPfId);
 
           if (!mounted) return;
           Navigator.pushReplacement(

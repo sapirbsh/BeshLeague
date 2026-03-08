@@ -13,6 +13,7 @@ import 'package:besh_league/screens/league_screen.dart';
 import 'package:besh_league/screens/multi_table_screen.dart';
 import 'package:besh_league/screens/spin_wheel_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -729,7 +730,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       }),
                       _buildMenuButton("תמיכה", () => _showSupportDialog()),
                       _buildMenuButton("תקנון", () => _showTermsDialog()),
-                      _buildMenuButton("התנתק", () { Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const AuthScreen()), (Route<dynamic> route) => false); }),
+                      _buildMenuButton("התנתק", () async {
+                        const storage = FlutterSecureStorage();
+                        await storage.deleteAll();
+                        if (!context.mounted) return;
+                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const AuthScreen()), (Route<dynamic> route) => false);
+                      }),
                     ],
                   ),
                 ),

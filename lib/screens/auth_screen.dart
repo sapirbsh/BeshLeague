@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:besh_league/screens/register_screen.dart';
 import 'package:besh_league/screens/home_screen.dart';
 import 'package:besh_league/screens/about_screen.dart';
@@ -109,13 +109,13 @@ Future<void> _loginUser() async {
 
         setState(() { _isLoading = false; });
 
-        // 3. שומרים את פרטי ההתחברות לשימוש עתידי (כולל פרטים לצורך Silent Login)
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('sessionTicket', sessionTicket);
-        await prefs.setString('playFabId', playFabId);
-        await prefs.setString('loginIdentifier', identifier);
-        await prefs.setString('loginPassword', password);
-        await prefs.setBool('loginIsEmail', isEmail);
+        // 3. שומרים את פרטי ההתחברות בצורה מאובטחת לצורך Silent Login
+        const storage = FlutterSecureStorage();
+        await storage.write(key: 'sessionTicket',    value: sessionTicket);
+        await storage.write(key: 'playFabId',        value: playFabId);
+        await storage.write(key: 'loginIdentifier',  value: identifier);
+        await storage.write(key: 'loginPassword',    value: password);
+        await storage.write(key: 'loginIsEmail',     value: isEmail ? 'true' : 'false');
 
         // 4. אם הכל תקין והוא לא חסום, מכניסים אותו למסך הבית
         if (mounted) {
