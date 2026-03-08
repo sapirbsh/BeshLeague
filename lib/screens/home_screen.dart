@@ -35,6 +35,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _previousCoins = 0;
   bool _showCoinFly = false;
   late AnimationController _coinFlyController;
+  late AnimationController _spinBlinkController;
+  late Animation<double> _spinBlinkAnim;
   int trophies = 0;
   int xp = 0;
   int dailyGamesPlayed = 0;
@@ -121,6 +123,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _coinFlyController.reset();
       }
     });
+    _spinBlinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat(reverse: true);
+    _spinBlinkAnim = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _spinBlinkController, curve: Curves.easeInOut),
+    );
     _fetchPlayerData();
     _liveRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _fetchPlayerData(isBackground: true);
@@ -130,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _coinFlyController.dispose();
+    _spinBlinkController.dispose();
     _friendAddController.dispose();
     _liveRefreshTimer?.cancel();
     super.dispose();
@@ -1009,6 +1019,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               child: GestureDetector(
                                 onTap: () => setState(() => _isFriendsPanelOpen = true),
                                 child: _buildFriendsButton(height),
+                              ),
+                            ),
+                          // כפתור גלגל המזל - מהבהב בצד ימין
+                          if (!_isFriendsPanelOpen)
+                            Positioned(
+                              right: 10,
+                              bottom: height * 0.08,
+                              child: AnimatedBuilder(
+                                animation: _spinBlinkAnim,
+                                builder: (ctx, child) => Opacity(
+                                  opacity: _spinBlinkAnim.value,
+                                  child: child,
+                                ),
+                                child: GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => SpinWheelScreen(
+                                      sessionTicket: widget.sessionTicket,
+                                      playFabId: widget.playFabId,
+                                    )),
+                                  ).then((_) { if (mounted) _fetchPlayerData(showCoinAnimation: true); }),
+                                  child: Container(
+                                    width: height * 0.13,
+                                    height: height * 0.13,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const RadialGradient(colors: [Color(0xFFFFE066), Color(0xFFB8860B)]),
+                                      border: Border.all(color: Colors.white, width: 2.5),
+                                      boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.8), blurRadius: 16, spreadRadius: 3)],
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: const [
+                                        Text('🎰', style: TextStyle(fontSize: 26)),
+                                        Text('גלגל\nמזל', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87, height: 1.1), textAlign: TextAlign.center),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           // פאנל חברים צף (מוצג כשפתוח)
